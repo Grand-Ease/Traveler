@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -82,6 +82,28 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
     store.updateTrip({ ...trip, locations: setDayPlaces(trip, day, places) })
   }
 
+  const goPrev = () => setDayIndex((i) => Math.max(0, i - 1))
+  const goNext = () => setDayIndex((i) => Math.min(days.length - 1, i + 1))
+
+  // Horizontal swipe anywhere on the screen navigates days.
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0]
+    touchStart.current = { x: t.clientX, y: t.clientY }
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const s = touchStart.current
+    touchStart.current = null
+    if (!s) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - s.x
+    const dy = t.clientY - s.y
+    // Require a clearly horizontal swipe so vertical scrolling isn't hijacked.
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    if (dx < 0) goNext()
+    else goPrev()
+  }
+
   function startAdd() {
     const type: ItemType = filter === 'all' ? 'activity' : filter
     setEditing({ type, title: '', date: day })
@@ -90,7 +112,11 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
   const totalDay = itemsOnDay(day).length
 
   return (
-    <div className="min-h-full flex flex-col max-w-2xl mx-auto w-full">
+    <div
+      className="min-h-full flex flex-col max-w-2xl mx-auto w-full"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Header card */}
       <div className="px-4 safe-top">
         <div className="flex justify-end mb-1">
@@ -100,7 +126,7 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
           <DayLocations trip={trip} day={day} canEdit={canEdit} onSave={saveDayPlaces} />
           <div className="flex items-center justify-between mt-2">
             <button
-              onClick={() => setDayIndex((i) => Math.max(0, i - 1))}
+              onClick={goPrev}
               disabled={dayIndex === 0}
               className="p-1 disabled:opacity-30"
             >
@@ -114,7 +140,7 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
               </p>
             </div>
             <button
-              onClick={() => setDayIndex((i) => Math.min(days.length - 1, i + 1))}
+              onClick={goNext}
               disabled={dayIndex >= days.length - 1}
               className="p-1 disabled:opacity-30"
             >
