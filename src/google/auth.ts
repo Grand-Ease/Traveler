@@ -38,8 +38,10 @@ export function hasSignedInBefore(): boolean {
 }
 
 let tokenClient: TokenClient | null = null
-let accessToken: string | null = sessionStorage.getItem(TOKEN_KEY)
-let tokenExpiry = Number(sessionStorage.getItem(TOKEN_EXP_KEY) || 0)
+// Persisted in localStorage so the session survives app/tab restarts (access
+// tokens last ~1h). sessionStorage would be wiped on every launch.
+let accessToken: string | null = localStorage.getItem(TOKEN_KEY)
+let tokenExpiry = Number(localStorage.getItem(TOKEN_EXP_KEY) || 0)
 
 function waitForGis(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -70,8 +72,8 @@ async function ensureClient(): Promise<TokenClient> {
 function persist(token: string, expiresIn: number) {
   accessToken = token
   tokenExpiry = Date.now() + (expiresIn - 60) * 1000 // refresh 60s early
-  sessionStorage.setItem(TOKEN_KEY, token)
-  sessionStorage.setItem(TOKEN_EXP_KEY, String(tokenExpiry))
+  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(TOKEN_EXP_KEY, String(tokenExpiry))
   localStorage.setItem(SIGNED_IN_BEFORE, '1')
 }
 
@@ -124,8 +126,8 @@ export function signOut() {
   const t = accessToken
   accessToken = null
   tokenExpiry = 0
-  sessionStorage.removeItem(TOKEN_KEY)
-  sessionStorage.removeItem(TOKEN_EXP_KEY)
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(TOKEN_EXP_KEY)
   localStorage.removeItem(SIGNED_IN_BEFORE)
   if (t && window.google?.accounts?.oauth2) window.google.accounts.oauth2.revoke(t)
 }
