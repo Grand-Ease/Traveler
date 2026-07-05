@@ -106,7 +106,15 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
 
   function startAdd() {
     const type: ItemType = filter === 'all' ? 'activity' : filter
-    setEditing({ type, title: '', date: day })
+    // Default new items to noon; give types with an end field a +1h default.
+    const hasEnd = type !== 'note' && type !== 'lodging'
+    setEditing({
+      type,
+      title: '',
+      date: day,
+      startTime: '12:00',
+      ...(hasEnd ? { endTime: '13:00' } : {}),
+    })
   }
 
   const totalDay = itemsOnDay(day).length

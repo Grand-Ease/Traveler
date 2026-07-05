@@ -26,6 +26,16 @@ interface Props {
 
 const TYPES: ItemType[] = ['travel', 'lodging', 'dining', 'activity', 'note']
 
+/** Add one hour to an `HH:mm` string, wrapping past midnight (23:30 -> 00:30). */
+function addOneHour(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm
+  const total = (h * 60 + m + 60) % (24 * 60)
+  const nh = Math.floor(total / 60)
+  const nm = total % 60
+  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
+}
+
 export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }: Props) {
   const [item, setItem] = useState<ItineraryItem>({ ...initial })
   const [saving, setSaving] = useState(false)
@@ -35,6 +45,8 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
   const [detectedTz, setDetectedTz] = useState<string | null | undefined>(
     initial.timezone,
   )
+  // Once the user edits End directly, stop auto-following the Start time.
+  const [endTouched, setEndTouched] = useState(false)
   const isNew = !item.id
 
   const set = <K extends keyof ItineraryItem>(k: K, v: ItineraryItem[K]) =>
@@ -204,7 +216,17 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
                   type="time"
                   className="field"
                   value={item.startTime || ''}
-                  onChange={(e) => set('startTime', e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    // Auto-follow End at +1h until the user edits End themselves
+                    // (an empty End still counts as untouched).
+                    const follow = v && (!endTouched || !item.endTime)
+                    setItem((p) => ({
+                      ...p,
+                      startTime: v,
+                      ...(follow ? { endTime: addOneHour(v) } : {}),
+                    }))
+                  }}
                 />
               </Field>
               {item.type !== 'note' && (
@@ -213,7 +235,10 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
                     type="time"
                     className="field"
                     value={item.endTime || ''}
-                    onChange={(e) => set('endTime', e.target.value)}
+                    onChange={(e) => {
+                      setEndTouched(true)
+                      set('endTime', e.target.value)
+                    }}
                   />
                 </Field>
               )}
