@@ -8,12 +8,14 @@ import {
   Sparkles,
 } from 'lucide-react'
 import type { ItineraryItem, ItemType, Trip } from '../types'
-import { deleteItem, listItems } from '../google/calendar'
 import { addDays, eachDay, TYPE_LABEL, weekdayLong } from '../lib/format'
+import * as store from '../store/store'
+import { useItems } from '../store/hooks'
 import { TYPE_ICONS } from './icons'
 import ItemCard from './ItemCard'
 import ItemForm from './ItemForm'
 import ImportModal from './ImportModal'
+import SyncBadge from './SyncBadge'
 
 interface Props {
   trip: Trip
@@ -24,32 +26,13 @@ type Filter = 'all' | ItemType
 const FILTERS: Filter[] = ['all', 'travel', 'lodging', 'dining', 'activity', 'note']
 
 export default function TripDetail({ trip, onBack }: Props) {
-  const [items, setItems] = useState<ItineraryItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const items = useItems(trip.id)
   const [filter, setFilter] = useState<Filter>('all')
   const [dayIndex, setDayIndex] = useState(0)
   const [editing, setEditing] = useState<ItineraryItem | null>(null)
   const [importing, setImporting] = useState(false)
 
   const canEdit = trip.accessRole !== 'reader'
-
-  async function load() {
-    setLoading(true)
-    setError('')
-    try {
-      setItems(await listItems(trip.id))
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trip.id])
 
   // All days = trip range unioned with any item dates that fall outside.
   const days = useMemo(() => {
@@ -86,15 +69,10 @@ export default function TripDetail({ trip, onBack }: Props) {
     .filter((it) => filter === 'all' || it.type === filter)
     .sort((a, b) => (a.startTime || '99').localeCompare(b.startTime || '99'))
 
-  async function removeItem(it: ItineraryItem) {
+  function removeItem(it: ItineraryItem) {
     if (!it.id) return
     if (!confirm(`Delete “${it.title}”?`)) return
-    try {
-      await deleteItem(trip.id, it.id)
-      setItems((xs) => xs.filter((x) => x.id !== it.id))
-    } catch (e) {
-      setError((e as Error).message)
-    }
+    store.deleteItem(trip.id, it.id)
   }
 
   function startAdd() {
@@ -108,6 +86,9 @@ export default function TripDetail({ trip, onBack }: Props) {
     <div className="min-h-full flex flex-col max-w-2xl mx-auto w-full">
       {/* Header card */}
       <div className="px-4 safe-top">
+        <div className="flex justify-end mb-1">
+          <SyncBadge />
+        </div>
         <div className="bg-headerCard border border-white/20 rounded-2xl p-4">
           <div className="flex items-center justify-between">
             <button
@@ -160,9 +141,7 @@ export default function TripDetail({ trip, onBack }: Props) {
 
       {/* Items */}
       <div className="flex-1 overflow-y-auto px-4 pb-bar space-y-2">
-        {loading && <p className="text-white/40 text-center py-10">Loading itinerary…</p>}
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        {!loading && dayItems.length === 0 && !error && (
+        {dayItems.length === 0 && (
           <div className="text-center py-16 text-white/40">
             <p>Nothing planned{filter === 'all' ? '' : ` for ${TYPE_LABEL[filter as ItemType]}`} on this day.</p>
             {canEdit && (
@@ -218,10 +197,7 @@ export default function TripDetail({ trip, onBack }: Props) {
           calendarId={trip.id}
           initial={editing}
           onClose={() => setEditing(null)}
-          onSaved={(saved, isNew) => {
-            setItems((xs) =>
-              isNew ? [...xs, saved] : xs.map((x) => (x.id === saved.id ? saved : x)),
-            )
+          onSaved={(saved) => {
             setEditing(null)
             if (saved.date) {
               const idx = days.indexOf(saved.date)
@@ -234,10 +210,7 @@ export default function TripDetail({ trip, onBack }: Props) {
         <ImportModal
           calendarId={trip.id}
           onClose={() => setImporting(false)}
-          onImported={(added) => {
-            setItems((xs) => [...xs, ...added])
-            setImporting(false)
-          }}
+          onImported={() => setImporting(false)}
         />
       )}
     </div>

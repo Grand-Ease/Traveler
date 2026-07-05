@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
 import type { ItineraryItem } from '../types'
-import { addItem } from '../google/calendar'
+import * as store from '../store/store'
 import { hasLocation, timezoneForItem } from '../lib/geo'
 import { parseItems } from '../lib/schema'
 import { SCHEMA_PROMPT } from '../lib/schema'
@@ -50,7 +50,7 @@ export default function ImportModal({ calendarId, onClose, onImported }: Props) 
         // Auto-detect the timezone from the location when the LLM didn't supply one.
         let tz = it.timezone
         if (!tz && hasLocation(it)) tz = (await timezoneForItem(it)) || undefined
-        saved.push(await addItem(calendarId, { ...it, timezone: tz }))
+        saved.push(store.addItem(calendarId, { ...it, timezone: tz }))
       }
       onImported(saved)
     } catch (e) {

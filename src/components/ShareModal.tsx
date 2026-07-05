@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Trip } from '../types'
 import { listShares, shareTrip, unshareTrip, type AclEntry } from '../google/calendar'
+import { isOnline } from '../store/store'
 import Modal from './Modal'
 
 interface Props {
@@ -15,7 +16,9 @@ export default function ShareModal({ trip, onClose }: Props) {
   const [shares, setShares] = useState<AclEntry[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const canManage = trip.accessRole === 'owner'
+  const online = isOnline()
+  const unsynced = trip.id.startsWith('tmp_')
+  const canManage = trip.accessRole === 'owner' && online && !unsynced
 
   async function refresh() {
     try {
@@ -60,7 +63,15 @@ export default function ShareModal({ trip, onClose }: Props) {
 
   return (
     <Modal title={`Share “${trip.name}”`} onClose={onClose}>
-      {!canManage ? (
+      {!online ? (
+        <p className="text-white/60 text-sm">
+          Sharing needs an internet connection. Reconnect to invite people.
+        </p>
+      ) : unsynced ? (
+        <p className="text-white/60 text-sm">
+          This trip hasn’t synced to Google yet. Once it’s uploaded you can share it.
+        </p>
+      ) : trip.accessRole !== 'owner' ? (
         <p className="text-white/60 text-sm">
           Only the trip owner can manage sharing. You have{' '}
           <span className="text-white">{trip.accessRole}</span> access.

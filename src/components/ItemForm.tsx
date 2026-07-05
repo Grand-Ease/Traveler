@@ -6,7 +6,7 @@ import {
   type ItineraryItem,
   type ItemType,
 } from '../types'
-import { addItem, updateItem } from '../google/calendar'
+import * as store from '../store/store'
 import { TYPE_LABEL } from '../lib/format'
 import { deviceTimezone, tzCity } from '../lib/timezones'
 import { hasLocation, timezoneForItem } from '../lib/geo'
@@ -68,16 +68,16 @@ export default function ItemForm({ calendarId, initial, onClose, onSaved }: Prop
     setSaving(true)
     setError('')
     try {
-      // Ensure the timezone reflects the current location before saving
-      // (cached, so this is instant if already resolved).
+      // Resolve the timezone from the location before saving. When offline this
+      // may return null and we simply save without it (device tz is used).
       let toSave = item
       if (hasLocation(item)) {
-        const tz = (await timezoneForItem(item)) || undefined
+        const tz = (await timezoneForItem(item)) || item.timezone
         toSave = { ...item, timezone: tz }
       }
       const saved = isNew
-        ? await addItem(calendarId, toSave)
-        : await updateItem(calendarId, toSave)
+        ? store.addItem(calendarId, toSave)
+        : store.updateItem(calendarId, toSave)
       onSaved(saved, isNew)
     } catch (e) {
       setError((e as Error).message)

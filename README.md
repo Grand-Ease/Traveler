@@ -24,6 +24,31 @@ It is a **static site** (no backend, no database), so it hosts for free on GitHu
 - **Share** a trip by email straight from the app (uses the Calendar ACL API).
 - **Add from email / dictation**: paste a schema prompt into any LLM with a reservation
   email, paste the returned JSON back, review, and import.
+- **Works offline** — reads and edits keep working with no connection and sync
+  automatically when you're back online (see below).
+
+---
+
+## Offline-first
+
+Google Calendar is the source of truth, but the app never blocks on the network:
+
+- **Instant + offline reads.** Trips and their items are cached in `localStorage`,
+  so the app opens instantly and shows your itinerary even with no signal. A service
+  worker (`public/sw.js`) caches the app shell so the site itself loads offline too.
+- **Offline writes.** Adding, editing, and deleting trips or items works offline.
+  Each change is applied to the local cache immediately and appended to a **pending
+  queue**.
+- **Automatic sync.** When connectivity returns (or right after each change while
+  online), the queue is flushed to Google Calendar in order, temporary IDs are
+  swapped for the real Google IDs, and fresh server state is pulled back down.
+- **Status indicator.** A small cloud badge in the header shows `Up to date`,
+  `Syncing…`, `N to sync`, or `Offline · N to sync`. Tap it to force a sync.
+- **Online-only actions.** Sharing (Calendar ACLs) needs a connection and is
+  disabled with a hint when offline or before a new trip has finished its first sync.
+
+Note: your first-ever sign-in requires a connection (Google OAuth). After that you
+can use the app offline; queued changes sync once you're back online.
 
 ---
 

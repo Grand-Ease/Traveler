@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { LogOut, Pencil, Plus, Settings, Share2, Trash2 } from 'lucide-react'
 import type { Trip } from '../types'
-import { deleteTrip, listTrips, unsubscribeTrip } from '../google/calendar'
 import { signOut } from '../google/auth'
 import { asset } from '../config'
 import { shortRange } from '../lib/format'
+import * as store from '../store/store'
+import { useSyncStatus, useTrips } from '../store/hooks'
 import AddTripModal from './AddTripModal'
 import ShareModal from './ShareModal'
 import SettingsModal from './SettingsModal'
+import SyncBadge from './SyncBadge'
 
 interface Props {
   onOpenTrip: (trip: Trip) => void
@@ -15,46 +17,25 @@ interface Props {
 }
 
 export default function Home({ onOpenTrip, onSignOut }: Props) {
-  const [trips, setTrips] = useState<Trip[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const trips = useTrips()
+  const status = useSyncStatus()
   const [selected, setSelected] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
   const [sharing, setSharing] = useState<Trip | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  async function load() {
-    setLoading(true)
-    setError('')
-    try {
-      setTrips(await listTrips())
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
-
+  const loading = trips.length === 0 && status.syncing
   const selectedTrip = trips.find((t) => t.id === selected) || null
 
-  async function removeTrip(trip: Trip) {
+  function removeTrip(trip: Trip) {
     const owned = trip.accessRole === 'owner'
     const msg = owned
       ? `Delete “${trip.name}”? This removes the trip calendar for everyone.`
       : `Remove “${trip.name}” from your list? (The owner still has it.)`
     if (!confirm(msg)) return
-    try {
-      owned ? await deleteTrip(trip.id) : await unsubscribeTrip(trip.id)
-      setSelected(null)
-      setTrips((ts) => ts.filter((t) => t.id !== trip.id))
-    } catch (e) {
-      setError((e as Error).message)
-    }
+    store.deleteTrip(trip)
+    setSelected(null)
   }
 
   return (
@@ -70,6 +51,7 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
           <p className="text-xs text-white/60 font-medium">GrandEase Traveler</p>
           <h1 className="text-xl font-semibold">Where will you go?</h1>
         </div>
+        <SyncBadge />
         <button
           onClick={() => setSettingsOpen(true)}
           className="text-white/50 hover:text-white p-2"
@@ -100,8 +82,7 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
 
       <div className="flex-1 overflow-y-auto px-4 pb-bar space-y-2">
         {loading && <p className="text-white/40 text-center py-10">Loading trips…</p>}
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        {!loading && trips.length === 0 && !error && (
+        {!loading && trips.length === 0 && (
           <div className="text-center py-16 text-white/40">
             <p>No trips yet.</p>
             <button className="btn-primary mt-4" onClick={() => setAdding(true)}>
@@ -172,7 +153,6 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
         <AddTripModal
           onClose={() => setAdding(false)}
           onSaved={(t) => {
-            setTrips((ts) => [...ts, t].sort((a, b) => a.startDate.localeCompare(b.startDate)))
             setAdding(false)
             setSelected(t.id)
           }}
@@ -182,10 +162,7 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
         <AddTripModal
           edit={editing}
           onClose={() => setEditing(null)}
-          onSaved={(t) => {
-            setTrips((ts) => ts.map((x) => (x.id === t.id ? t : x)))
-            setEditing(null)
-          }}
+          onSaved={() => setEditing(null)}
         />
       )}
       {sharing && <ShareModal trip={sharing} onClose={() => setSharing(null)} />}

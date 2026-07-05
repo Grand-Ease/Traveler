@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // Relative base so the build works on GitHub Pages project sites
 // (https://user.github.io/<repo>/) without hard-coding the repo name.
+// The service worker (public/sw.js) is registered manually in main.tsx.
 export default defineConfig({
   base: './',
   plugins: [react()],

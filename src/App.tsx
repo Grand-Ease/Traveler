@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Trip } from './types'
-import { getToken, hasValidToken } from './google/auth'
+import { getToken, hasSignedInBefore, hasValidToken } from './google/auth'
 import { getClientId } from './config'
 import SignIn from './components/SignIn'
 import Home from './components/Home'
@@ -15,12 +15,22 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
 
   useEffect(() => {
-    // Try to silently restore a session on load.
+    // Offline-first session restore: if the user has signed in before, let them
+    // straight into the app (cached data works offline); refresh the token in the
+    // background so writes can sync when possible.
     async function restore() {
       if (!getClientId()) return setChecking(false)
-      if (hasValidToken()) {
+      if (hasValidToken() || hasSignedInBefore()) {
         setAuthed(true)
-        return setChecking(false)
+        setChecking(false)
+        if (!hasValidToken() && navigator.onLine) {
+          try {
+            await getToken()
+          } catch {
+            /* token refresh may need interaction; sync will surface any issue */
+          }
+        }
+        return
       }
       try {
         await getToken()

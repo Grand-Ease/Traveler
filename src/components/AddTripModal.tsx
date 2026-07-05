@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Trip } from '../types'
-import { createTrip, updateTrip } from '../google/calendar'
 import { toDateOnly } from '../lib/format'
+import * as store from '../store/store'
 import Modal from './Modal'
 
 interface Props {
@@ -15,25 +15,17 @@ export default function AddTripModal({ edit, onClose, onSaved }: Props) {
   const [name, setName] = useState(edit?.name || '')
   const [start, setStart] = useState(edit?.startDate || today)
   const [end, setEnd] = useState(edit?.endDate || today)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  async function save() {
+  function save() {
     if (!name.trim()) return setError('Please enter a trip name.')
     if (end < start) return setError('End date must be on or after the start date.')
-    setSaving(true)
-    setError('')
-    try {
-      if (edit) {
-        const updated = { ...edit, name: name.trim(), startDate: start, endDate: end }
-        await updateTrip(updated)
-        onSaved(updated)
-      } else {
-        onSaved(await createTrip(name.trim(), start, end))
-      }
-    } catch (e) {
-      setError((e as Error).message)
-      setSaving(false)
+    if (edit) {
+      const updated = { ...edit, name: name.trim(), startDate: start, endDate: end }
+      store.updateTrip(updated)
+      onSaved(updated)
+    } else {
+      onSaved(store.createTrip(name.trim(), start, end))
     }
   }
 
@@ -43,11 +35,11 @@ export default function AddTripModal({ edit, onClose, onSaved }: Props) {
       onClose={onClose}
       footer={
         <>
-          <button className="btn-ghost" onClick={onClose} disabled={saving}>
+          <button className="btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn-primary" onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : edit ? 'Save' : 'Create'}
+          <button className="btn-primary" onClick={save}>
+            {edit ? 'Save' : 'Create'}
           </button>
         </>
       }

@@ -30,6 +30,12 @@ declare global {
 
 const TOKEN_KEY = 'grandease.token'
 const TOKEN_EXP_KEY = 'grandease.tokenExp'
+const SIGNED_IN_BEFORE = 'grandease.signedInBefore'
+
+/** True if the user has completed an interactive sign-in on this device before. */
+export function hasSignedInBefore(): boolean {
+  return localStorage.getItem(SIGNED_IN_BEFORE) === '1'
+}
 
 let tokenClient: TokenClient | null = null
 let accessToken: string | null = sessionStorage.getItem(TOKEN_KEY)
@@ -66,6 +72,7 @@ function persist(token: string, expiresIn: number) {
   tokenExpiry = Date.now() + (expiresIn - 60) * 1000 // refresh 60s early
   sessionStorage.setItem(TOKEN_KEY, token)
   sessionStorage.setItem(TOKEN_EXP_KEY, String(tokenExpiry))
+  localStorage.setItem(SIGNED_IN_BEFORE, '1')
 }
 
 export function hasValidToken(): boolean {
@@ -105,5 +112,6 @@ export function signOut() {
   tokenExpiry = 0
   sessionStorage.removeItem(TOKEN_KEY)
   sessionStorage.removeItem(TOKEN_EXP_KEY)
+  localStorage.removeItem(SIGNED_IN_BEFORE)
   if (t && window.google?.accounts?.oauth2) window.google.accounts.oauth2.revoke(t)
 }
