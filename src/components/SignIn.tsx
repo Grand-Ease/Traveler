@@ -41,7 +41,7 @@ export default function SignIn({ onSignedIn }: Props) {
   }
 
   return (
-    <div className="min-h-full flex flex-col items-center justify-center px-6 text-center">
+    <div className="h-full overflow-y-auto flex flex-col items-center justify-center px-6 py-10 text-center">
       <img
         src={asset('logo-cube.png')}
         alt=""

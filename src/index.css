@@ -7,9 +7,20 @@
 }
 
 html,
-body,
-#root {
+body {
   height: 100%;
+  /* Lock the page so only inner regions scroll — keeps headers/footers pinned
+     and stops iOS rubber-band from moving the whole app. */
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Root tracks the dynamic viewport so the pinned footer isn't hidden behind
+   iOS's collapsing toolbars. */
+#root {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 body {
@@ -30,9 +41,11 @@ button {
   font-size: 16px;
 }
 
-/* Momentum scrolling for scroll containers on iOS. */
+/* Momentum scrolling for scroll containers on iOS; contain overscroll so a
+   flick at the top/bottom edge doesn't chain-scroll (and move) the page. */
 .overflow-y-auto {
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* Safe-area helpers for the notch and home indicator. */

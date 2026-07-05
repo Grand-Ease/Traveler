@@ -4,7 +4,7 @@ import { asset } from '../config'
 export default function Splash() {
   return (
     <div
-      className="min-h-full w-full flex items-center justify-center overflow-hidden"
+      className="h-full w-full flex items-center justify-center overflow-hidden"
       style={{ background: 'linear-gradient(180deg, #b4b1a9 0%, #6d6b66 100%)' }}
     >
       <img

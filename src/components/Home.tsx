@@ -39,7 +39,7 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
   }
 
   return (
-    <div className="min-h-full flex flex-col max-w-2xl mx-auto w-full">
+    <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
       <header className="flex items-center gap-3 px-4 pb-4 safe-top">
         <img
           src={asset('logo-cube.png')}

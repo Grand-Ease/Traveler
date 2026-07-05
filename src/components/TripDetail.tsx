@@ -147,7 +147,7 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
 
   return (
     <div
-      className="flex flex-col h-[100dvh] max-w-2xl mx-auto w-full"
+      className="flex flex-col h-full max-w-2xl mx-auto w-full"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
