@@ -3,7 +3,7 @@ import { ChevronRight, MapPin, Plus, X } from 'lucide-react'
 import type { DayPlace, Trip } from '../types'
 import { activePlaceIndex, placesForDay, refTimeForDay } from '../lib/locations'
 import { timezoneForQuery } from '../lib/geo'
-import { tzAbbrev, tzCity } from '../lib/timezones'
+import { tzAbbrev } from '../lib/timezones'
 import { formatTime } from '../lib/format'
 
 interface Props {
@@ -165,7 +165,7 @@ export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
       >
         {places.map((p, i) => {
           const isActive = i === active
-          const tzTag = p.tz ? `${tzAbbrev(p.tz)} · ${tzCity(p.tz)}` : ''
+          const tzTag = p.tz ? tzAbbrev(p.tz) : ''
           return (
             <div key={i} className="flex items-center gap-1.5">
               {i > 0 && <ChevronRight size={16} className="text-white/30 shrink-0" />}
@@ -174,9 +174,9 @@ export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
                 className={isActive ? 'text-yellow-300 shrink-0' : 'text-white/40 shrink-0'}
               />
               <span
-                className={
+                className={`whitespace-nowrap ${
                   isActive ? 'text-2xl font-bold text-yellow-300' : 'text-base text-white/80'
-                }
+                }`}
               >
                 {p.name}
               </span>
