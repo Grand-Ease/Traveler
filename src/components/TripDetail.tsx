@@ -113,67 +113,71 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
 
   return (
     <div
-      className="min-h-full flex flex-col max-w-2xl mx-auto w-full"
+      className="flex flex-col h-[100dvh] max-w-2xl mx-auto w-full"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* Header card */}
-      <div className="px-4 safe-top">
-        <div className="flex justify-end mb-1">
-          <SyncBadge />
-        </div>
-        <div className="bg-headerCard border border-white/20 rounded-2xl p-4">
-          <DayLocations trip={trip} day={day} canEdit={canEdit} onSave={saveDayPlaces} />
-          <div className="flex items-center justify-between mt-2">
-            <button
-              onClick={goPrev}
-              disabled={dayIndex === 0}
-              className="p-1 disabled:opacity-30"
-            >
-              <ChevronLeft size={22} />
-            </button>
-            <div className="text-center">
-              <h1 className="text-xl font-bold">{weekdayLong(day)}</h1>
-              <p className="text-white/50 text-xs mt-1">
-                {trip.name} · Day {dayIndex + 1} of {days.length} · {totalDay} item
-                {totalDay === 1 ? '' : 's'}
-              </p>
+      {/* Header (fixed, does not scroll) */}
+      <div className="shrink-0">
+        <div className="px-4 safe-top">
+          <div className="flex justify-end mb-1">
+            <SyncBadge />
+          </div>
+          <div className="bg-headerCard border border-white/20 rounded-2xl p-4">
+            <DayLocations trip={trip} day={day} canEdit={canEdit} onSave={saveDayPlaces} />
+            <div className="flex items-center justify-between mt-2">
+              <button
+                onClick={goPrev}
+                disabled={dayIndex === 0}
+                className="p-1 disabled:opacity-30"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <div className="text-center">
+                <h1 className="text-xl font-bold">{weekdayLong(day)}</h1>
+                <p className="text-white/50 text-xs mt-1">
+                  {trip.name} · Day {dayIndex + 1} of {days.length} · {totalDay} item
+                  {totalDay === 1 ? '' : 's'}
+                </p>
+              </div>
+              <button
+                onClick={goNext}
+                disabled={dayIndex >= days.length - 1}
+                className="p-1 disabled:opacity-30"
+              >
+                <ChevronRight size={22} />
+              </button>
             </div>
-            <button
-              onClick={goNext}
-              disabled={dayIndex >= days.length - 1}
-              className="p-1 disabled:opacity-30"
-            >
-              <ChevronRight size={22} />
-            </button>
           </div>
         </div>
+
+        {/* Category filter (icon-only) */}
+        <div className="flex gap-2 px-4 py-3">
+          {FILTERS.map((f) => {
+            const active = filter === f
+            const Ico = f === 'all' ? ListChecks : TYPE_ICONS[f]
+            const label = f === 'all' ? 'All' : TYPE_LABEL[f]
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                aria-label={label}
+                title={label}
+                className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border ${
+                  active
+                    ? 'bg-teal text-white border-teal'
+                    : 'border-white/15 text-white/60 hover:bg-white/5'
+                }`}
+              >
+                <Ico size={18} />
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Category filter */}
-      <div className="flex gap-2 overflow-x-auto px-4 py-3">
-        {FILTERS.map((f) => {
-          const active = filter === f
-          const Ico = f === 'all' ? ListChecks : TYPE_ICONS[f]
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border ${
-                active
-                  ? 'bg-teal text-white border-teal'
-                  : 'border-white/15 text-white/60 hover:bg-white/5'
-              }`}
-            >
-              <Ico size={15} />
-              {f === 'all' ? 'All' : TYPE_LABEL[f]}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Items */}
-      <div className="flex-1 overflow-y-auto px-4 pb-bar space-y-2">
+      {/* Items (only this region scrolls vertically) */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
         {dayItems.length === 0 && (
           <div className="text-center py-16 text-white/40">
             <p>Nothing planned{filter === 'all' ? '' : ` for ${TYPE_LABEL[filter as ItemType]}`} on this day.</p>
@@ -195,9 +199,9 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
         ))}
       </div>
 
-      {/* Bottom bar */}
-      <div className="fixed bottom-0 inset-x-0 border-t border-white/10 bg-black">
-        <div className="max-w-2xl mx-auto flex items-center justify-between px-6 pt-3 safe-bottom">
+      {/* Bottom bar (fixed, does not scroll) */}
+      <div className="shrink-0 border-t border-white/10 bg-black">
+        <div className="flex items-center justify-between px-6 pt-3 safe-bottom">
           <button
             onClick={onBack}
             className="flex flex-col items-center gap-1 text-xs text-white hover:text-teal"
