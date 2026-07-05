@@ -17,7 +17,7 @@ interface Props {
 // large and yellow; others are smaller and white. Editing a location detects
 // its timezone automatically.
 export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
-  const { places, inherited } = placesForDay(trip, day)
+  const { places } = placesForDay(trip, day)
   const active = activePlaceIndex(places, refTimeForDay(day))
   const [draft, setDraft] = useState<DayPlace[] | null>(null)
   const [detecting, setDetecting] = useState<Record<number, boolean>>({})
@@ -139,24 +139,26 @@ export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
     )
   }
 
-  // ---- read-only (centered, places side-by-side) ----
+  // ---- read-only (centered, places side-by-side; fixed height) ----
   if (!places.length) {
-    return canEdit ? (
-      <div className="flex justify-center">
-        <button
-          onClick={() => beginEdit()}
-          className="inline-flex items-center gap-1.5 text-white/50 hover:text-white"
-        >
-          <MapPin size={18} /> <span className="text-lg">Set destination</span>
-        </button>
+    return (
+      <div className="h-9 flex items-center justify-center">
+        {canEdit && (
+          <button
+            onClick={() => beginEdit()}
+            className="inline-flex items-center gap-1.5 text-white/50 hover:text-white"
+          >
+            <MapPin size={18} /> <span className="text-lg">Set destination</span>
+          </button>
+        )}
       </div>
-    ) : null
+    )
   }
 
   return (
-    <div className="text-center">
+    <div className="h-9 flex items-center justify-center">
       <div
-        className={`flex items-center justify-center flex-wrap gap-x-2 gap-y-1 ${
+        className={`flex items-center justify-center flex-wrap gap-x-2 ${
           canEdit ? 'cursor-pointer' : ''
         }`}
         onClick={canEdit ? () => beginEdit() : undefined}
@@ -204,9 +206,6 @@ export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
           </button>
         )}
       </div>
-      {inherited && (
-        <p className="text-white/30 text-xs mt-0.5">carried forward · tap to change</p>
-      )}
     </div>
   )
 }
