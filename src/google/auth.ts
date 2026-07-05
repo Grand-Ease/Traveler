@@ -79,31 +79,45 @@ export function hasValidToken(): boolean {
   return !!accessToken && Date.now() < tokenExpiry
 }
 
-/** Interactive sign-in (shows Google account chooser / consent). */
-export async function signIn(): Promise<string> {
+// Request a token with a timeout so a blocked popup / ITP-blocked silent iframe
+// never leaves a promise hanging forever (which would freeze the app on load).
+async function requestToken(prompt: string, timeoutMs: number): Promise<string> {
   const client = await ensureClient()
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new Error('Sign-in timed out.'))
+    }, timeoutMs)
     client.callback = (resp) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
       if (resp.error) return reject(new Error(resp.error))
       persist(resp.access_token, resp.expires_in)
       resolve(resp.access_token)
     }
-    client.requestAccessToken({ prompt: 'consent' })
+    client.requestAccessToken({ prompt })
   })
 }
 
-/** Return a valid token, silently refreshing if possible. */
+/**
+ * Interactive sign-in. MUST be called from a user gesture (button tap) so the
+ * browser allows the OAuth popup — iOS blocks popups opened without a gesture.
+ */
+export async function signIn(): Promise<string> {
+  return requestToken('consent', 120000)
+}
+
+/**
+ * Return a valid token WITHOUT ever opening a popup. Uses the silent grant
+ * (prompt: 'none'); rejects if interaction is required. Safe to call on load
+ * and from background sync — never blocks the UI.
+ */
 export async function getToken(): Promise<string> {
   if (hasValidToken()) return accessToken!
-  const client = await ensureClient()
-  return new Promise((resolve, reject) => {
-    client.callback = (resp) => {
-      if (resp.error) return reject(new Error(resp.error))
-      persist(resp.access_token, resp.expires_in)
-      resolve(resp.access_token)
-    }
-    client.requestAccessToken({ prompt: '' }) // silent if already consented
-  })
+  return requestToken('none', 8000)
 }
 
 export function signOut() {
