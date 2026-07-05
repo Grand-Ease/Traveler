@@ -21,8 +21,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
+      # Enables GitHub Pages for the repo automatically on first run.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - run: npm ci
       - run: npm run build
         env:
