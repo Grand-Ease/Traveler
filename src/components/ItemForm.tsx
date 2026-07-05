@@ -157,26 +157,21 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
 
         {item.type === 'travel' && (
           <SubtypeRow
+            type="travel"
             values={TRAVEL_SUBTYPES as unknown as string[]}
             selected={item.subtype || 'airplane'}
             onSelect={(s) => set('subtype', s)}
           />
         )}
         {item.type === 'activity' && (
-          <div>
-            <label className="label">Kind</label>
-            <select
-              className="field"
-              value={item.subtype || 'activity'}
-              onChange={(e) => set('subtype', e.target.value)}
-            >
-              {ACTIVITY_SUBTYPES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SubtypeRow
+            label="Kind"
+            type="activity"
+            values={ACTIVITY_SUBTYPES as unknown as string[]}
+            selected={item.subtype || 'activity'}
+            onSelect={(s) => set('subtype', s)}
+            scroll
+          />
         )}
 
         <Text label={titleLabel} value={item.title} onChange={(v) => set('title', v)} />
@@ -370,34 +365,52 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
 }
 
 function SubtypeRow({
+  type,
   values,
   selected,
   onSelect,
+  label,
+  scroll,
 }: {
+  type: ItemType
   values: string[]
   selected: string
   onSelect: (s: string) => void
+  label?: string
+  scroll?: boolean
 }) {
-  return (
-    <div className="flex gap-2">
+  const row = (
+    <div className={scroll ? 'flex gap-2 overflow-x-auto' : 'flex gap-2'}>
       {values.map((s) => {
-        const Ico = iconFor({ type: 'travel', subtype: s })
+        const Ico = iconFor({ type, subtype: s })
         const active = selected === s
         return (
           <button
             key={s}
             onClick={() => onSelect(s)}
-            className={`flex-1 flex items-center justify-center py-2 rounded-xl border ${
+            className={`${
+              scroll
+                ? 'shrink-0 w-11 h-11'
+                : 'flex-1 py-2'
+            } flex items-center justify-center rounded-xl border ${
               active
                 ? 'bg-teal/20 border-teal text-white'
                 : 'border-white/10 text-white/60 hover:bg-white/5'
             }`}
             title={s}
+            aria-label={s}
           >
             <Ico size={20} />
           </button>
         )
       })}
+    </div>
+  )
+  if (!label) return row
+  return (
+    <div>
+      <label className="label">{label}</label>
+      {row}
     </div>
   )
 }

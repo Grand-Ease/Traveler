@@ -61,17 +61,29 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
               {item.title}
               {item.type === 'travel' && item.number ? ` · ${item.number}` : ''}
             </h3>
-            {hasDetails && (
-              <button
-                onClick={() => setOpen((o) => !o)}
-                className="text-white/40 hover:text-white shrink-0"
-              >
-                <ChevronDown
-                  size={18}
-                  className={`transition ${open ? 'rotate-180' : ''}`}
-                />
-              </button>
-            )}
+            <div className="flex items-center gap-3 shrink-0">
+              {canEdit && (
+                <button
+                  onClick={onEdit}
+                  className="text-teal hover:opacity-80"
+                  title="Edit"
+                  aria-label="Edit"
+                >
+                  <Pencil size={16} />
+                </button>
+              )}
+              {hasDetails && (
+                <button
+                  onClick={() => setOpen((o) => !o)}
+                  className="text-white/40 hover:text-white"
+                >
+                  <ChevronDown
+                    size={18}
+                    className={`transition ${open ? 'rotate-180' : ''}`}
+                  />
+                </button>
+              )}
+            </div>
           </div>
 
           {item.type === 'travel' && (item.from || item.to) && (
@@ -117,23 +129,17 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
                 </p>
               )}
               {item.notes && <p className="text-white/70 whitespace-pre-wrap">{item.notes}</p>}
-            </div>
-          )}
 
-          {canEdit && (
-            <div className="mt-3 flex gap-4 text-sm">
-              <button
-                onClick={onEdit}
-                className="inline-flex items-center gap-1 text-teal hover:opacity-80"
-              >
-                <Pencil size={14} /> Edit
-              </button>
-              <button
-                onClick={onDelete}
-                className="inline-flex items-center gap-1 text-red-400 hover:opacity-80"
-              >
-                <Trash2 size={14} /> Delete
-              </button>
+              {canEdit && (
+                <div className="mt-3 flex text-sm">
+                  <button
+                    onClick={onDelete}
+                    className="inline-flex items-center gap-1 text-red-400 hover:opacity-80"
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
