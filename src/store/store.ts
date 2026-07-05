@@ -127,7 +127,8 @@ export function createTrip(name: string, start: string, end: string): Trip {
 }
 
 export function updateTrip(trip: Trip): void {
-  trips = trips.map((t) => (t.id === trip.id ? trip : t))
+  const id = resolve(trip.id)
+  trips = trips.map((t) => (t.id === id ? { ...trip, id } : t))
   persistTrips()
   const create = queue.find(
     (o) => o.kind === 'trip.create' && o.tempId === trip.id,
@@ -137,10 +138,10 @@ export function updateTrip(trip: Trip): void {
     create.start = trip.startDate
     create.end = trip.endDate
   } else {
-    queue = queue.filter((o) => !(o.kind === 'trip.update' && o.id === trip.id))
+    queue = queue.filter((o) => !(o.kind === 'trip.update' && o.id === id))
     queue.push({
       kind: 'trip.update',
-      id: trip.id,
+      id,
       name: trip.name,
       start: trip.startDate,
       end: trip.endDate,
@@ -152,24 +153,26 @@ export function updateTrip(trip: Trip): void {
 }
 
 export function deleteTrip(trip: Trip): void {
-  trips = trips.filter((t) => t.id !== trip.id)
+  const id = resolve(trip.id)
+  trips = trips.filter((t) => t.id !== id)
   persistTrips()
-  itemsCache.delete(trip.id)
-  localStorage.removeItem(K_ITEMS(trip.id))
+  itemsCache.delete(id)
+  localStorage.removeItem(K_ITEMS(id))
 
   const hadCreate = queue.some((o) => o.kind === 'trip.create' && o.tempId === trip.id)
-  // Drop any queued ops that reference this trip.
+  // Drop any queued ops that reference this trip (matching temp or real id).
+  const refs = new Set([id, trip.id])
   queue = queue.filter((o) => {
     if (o.kind === 'trip.create' && o.tempId === trip.id) return false
-    if (o.kind === 'trip.update' && o.id === trip.id) return false
+    if (o.kind === 'trip.update' && refs.has(o.id)) return false
     if ((o.kind === 'item.add' || o.kind === 'item.update' || o.kind === 'item.delete') &&
-        o.calendarId === trip.id)
+        refs.has(o.calendarId))
       return false
     return true
   })
   // Only tell the server to delete if it ever existed there.
   if (!hadCreate) {
-    queue.push({ kind: 'trip.delete', id: trip.id, owned: trip.accessRole === 'owner' })
+    queue.push({ kind: 'trip.delete', id, owned: trip.accessRole === 'owner' })
   }
   persistQueue()
   emit()
@@ -178,7 +181,8 @@ export function deleteTrip(trip: Trip): void {
 
 // ---------- item mutations (optimistic) ----------
 
-export function addItem(calId: string, item: ItineraryItem): ItineraryItem {
+export function addItem(calIdRaw: string, item: ItineraryItem): ItineraryItem {
+  const calId = resolve(calIdRaw)
   const tempId = uid()
   const saved: ItineraryItem = { ...item, id: tempId }
   const list = [...loadItems(calId), saved]
@@ -191,7 +195,8 @@ export function addItem(calId: string, item: ItineraryItem): ItineraryItem {
   return saved
 }
 
-export function updateItem(calId: string, item: ItineraryItem): ItineraryItem {
+export function updateItem(calIdRaw: string, item: ItineraryItem): ItineraryItem {
+  const calId = resolve(calIdRaw)
   const list = loadItems(calId).map((i) => (i.id === item.id ? item : i))
   itemsCache.set(calId, list)
   persistItems(calId)
@@ -211,7 +216,8 @@ export function updateItem(calId: string, item: ItineraryItem): ItineraryItem {
   return item
 }
 
-export function deleteItem(calId: string, id: string): void {
+export function deleteItem(calIdRaw: string, id: string): void {
+  const calId = resolve(calIdRaw)
   const list = loadItems(calId).filter((i) => i.id !== id)
   itemsCache.set(calId, list)
   persistItems(calId)
