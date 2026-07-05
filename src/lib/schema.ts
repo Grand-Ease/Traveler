@@ -15,7 +15,8 @@ Return ONLY a JSON array (no prose) of itinerary items. Each item:
   "title": string,                 // required. Airline/hotel/restaurant/activity name, or note title
   "subtype": string,               // travel: airplane|train|car|subway|ship
                                    // activity: ${ACTIVITY_SUBTYPES.join('|')}
-  "date": "YYYY-MM-DD",            // required. Start/check-in date
+  "date": "YYYY-MM-DD",            // required. Start/departure/check-in date
+  "endDate": "YYYY-MM-DD",         // travel only: arrival date if it differs from date (crosses midnight / multi-day)
   "startTime": "HH:mm",            // 24h DESTINATION-local time. Omit for all-day notes
   "endTime": "HH:mm",             // optional, destination-local
   "timezone": "IANA tz",          // OPTIONAL. Usually omit — the app derives it from location.
@@ -23,6 +24,7 @@ Return ONLY a JSON array (no prose) of itinerary items. Each item:
   "from": string,                  // travel only: departure airport/place
   "to": string,                    // travel only: arrival airport/place
   "number": string,                // travel only: flight/train number
+  "gate": string,                  // travel only: gate or platform
   "nights": number,                // lodging only: number of nights
   "confirmation": string,          // reservation/confirmation number
   "phone": string,
@@ -37,6 +39,8 @@ Rules:
   convert it to the reader's home time zone. Include a "location" (with city/country) so the
   app can set the correct time zone automatically; you can omit "timezone".
 - If a hotel stay is given by check-in and check-out dates, set date=check-in and nights=(nights between).
+- For travel that arrives on a later day than it departs (overnight flight, multi-day train/cruise),
+  set "endDate" to the arrival date. Omit "endDate" when arrival is the same day as departure.
 - Omit fields you don't have rather than using null.
 
 Reservation / notes follow:
@@ -118,6 +122,7 @@ export function parseItems(text: string): ParseResult {
       title: asString(r.title) || 'Untitled',
       subtype,
       date,
+      endDate: normDate(r.endDate),
       startTime: normTime(r.startTime),
       endTime: normTime(r.endTime),
       timezone: asString(r.timezone),
@@ -125,6 +130,7 @@ export function parseItems(text: string): ParseResult {
       from: asString(r.from),
       to: asString(r.to),
       number: asString(r.number),
+      gate: asString(r.gate),
       nights: r.nights != null ? Number(r.nights) || undefined : undefined,
       confirmation: asString(r.confirmation),
       phone: asString(r.phone),

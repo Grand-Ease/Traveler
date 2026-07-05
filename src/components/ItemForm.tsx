@@ -184,42 +184,32 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
         {item.type === 'travel' && (
           <div className="grid grid-cols-2 gap-3">
             <Text label="Flight / train #" value={item.number} onChange={(v) => set('number', v)} />
-            <Text label="Seats" value={item.seatsOrRoom} onChange={(v) => set('seatsOrRoom', v)} />
+            <Text label="Gate / Platform" value={item.gate} onChange={(v) => set('gate', v)} />
             <Text label="From" value={item.from} onChange={(v) => set('from', v)} />
             <Text label="To" value={item.to} onChange={(v) => set('to', v)} />
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={item.type === 'lodging' ? 'Check-in date' : 'Date'}>
-            <input
-              type="date"
-              className="field"
-              value={item.date}
-              onChange={(e) => set('date', e.target.value)}
-            />
-          </Field>
-          {item.type === 'lodging' ? (
-            <Field label="Nights">
-              <input
-                type="number"
-                min={1}
-                className="field"
-                value={item.nights ?? 1}
-                onChange={(e) => set('nights', Number(e.target.value))}
-              />
-            </Field>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Start">
+        {item.type === 'travel' ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Departure date">
+                <input
+                  type="date"
+                  className="field"
+                  value={item.date}
+                  onChange={(e) => set('date', e.target.value)}
+                />
+              </Field>
+              <Field label="Departure time">
                 <input
                   type="time"
                   className="field"
                   value={item.startTime || ''}
                   onChange={(e) => {
                     const v = e.target.value
-                    // Auto-follow End at +1h until the user edits End themselves
-                    // (an empty End still counts as untouched).
+                    // Auto-follow the arrival time at +1h until the user edits it
+                    // (an empty arrival still counts as untouched).
                     const follow = v && (!endTouched || !item.endTime)
                     setItem((p) => ({
                       ...p,
@@ -229,22 +219,88 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
                   }}
                 />
               </Field>
-              {item.type !== 'note' && (
-                <Field label="End">
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Arrival date">
+                <input
+                  type="date"
+                  className="field"
+                  value={item.endDate || ''}
+                  min={item.date || undefined}
+                  onChange={(e) => set('endDate', e.target.value || undefined)}
+                />
+              </Field>
+              <Field label="Arrival time">
+                <input
+                  type="time"
+                  className="field"
+                  value={item.endTime || ''}
+                  onChange={(e) => {
+                    setEndTouched(true)
+                    set('endTime', e.target.value)
+                  }}
+                />
+              </Field>
+            </div>
+            <Text label="Seats" value={item.seatsOrRoom} onChange={(v) => set('seatsOrRoom', v)} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={item.type === 'lodging' ? 'Check-in date' : 'Date'}>
+              <input
+                type="date"
+                className="field"
+                value={item.date}
+                onChange={(e) => set('date', e.target.value)}
+              />
+            </Field>
+            {item.type === 'lodging' ? (
+              <Field label="Nights">
+                <input
+                  type="number"
+                  min={1}
+                  className="field"
+                  value={item.nights ?? 1}
+                  onChange={(e) => set('nights', Number(e.target.value))}
+                />
+              </Field>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Start">
                   <input
                     type="time"
                     className="field"
-                    value={item.endTime || ''}
+                    value={item.startTime || ''}
                     onChange={(e) => {
-                      setEndTouched(true)
-                      set('endTime', e.target.value)
+                      const v = e.target.value
+                      // Auto-follow End at +1h until the user edits End themselves
+                      // (an empty End still counts as untouched).
+                      const follow = v && (!endTouched || !item.endTime)
+                      setItem((p) => ({
+                        ...p,
+                        startTime: v,
+                        ...(follow ? { endTime: addOneHour(v) } : {}),
+                      }))
                     }}
                   />
                 </Field>
-              )}
-            </div>
-          )}
-        </div>
+                {item.type !== 'note' && (
+                  <Field label="End">
+                    <input
+                      type="time"
+                      className="field"
+                      value={item.endTime || ''}
+                      onChange={(e) => {
+                        setEndTouched(true)
+                        set('endTime', e.target.value)
+                      }}
+                    />
+                  </Field>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <Text
           label="Location / address"

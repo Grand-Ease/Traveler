@@ -42,6 +42,8 @@ export interface ItineraryItem {
   subtype?: string
   /** Start date, YYYY-MM-DD (local to the trip). */
   date: string
+  /** Travel: arrival date, YYYY-MM-DD. Absent means arrival is the same day as `date`. */
+  endDate?: string
   /** Start time, HH:mm (24h). Omit for all-day / untimed notes. */
   startTime?: string
   /** End time, HH:mm (24h). Optional. */
@@ -55,6 +57,8 @@ export interface ItineraryItem {
   to?: string
   /** Travel: flight / train / confirmation number. */
   number?: string
+  /** Travel: gate or platform. */
+  gate?: string
   /** Lodging: number of nights. */
   nights?: number
   /** Reservation / confirmation number. */

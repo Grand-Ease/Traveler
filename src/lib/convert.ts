@@ -111,6 +111,7 @@ function coreData(item: ItineraryItem) {
     from: item.from,
     to: item.to,
     number: item.number,
+    gate: item.gate,
     nights: item.nights,
     confirmation: item.confirmation,
     phone: item.phone,
@@ -141,12 +142,14 @@ export function itemToEvent(item: ItineraryItem): GEvent {
     ev.end = { date: addDays(item.date, nights) } // end date is exclusive
   } else {
     const startTime = item.startTime || '09:00'
-    let endDate = item.date
+    // Arrival defaults to the same day as departure unless an explicit
+    // arrival date is set (multi-day travel that lands on a later date).
+    let endDate = item.endDate || item.date
     let endTime = item.endTime
     if (!endTime) {
       const r = addMinutesToTime(startTime, 60)
       endTime = r.time
-      if (r.dayShift) endDate = addDays(item.date, r.dayShift)
+      if (r.dayShift && !item.endDate) endDate = addDays(item.date, r.dayShift)
     }
     ev.start = { dateTime: rfc3339(item.date, startTime, tz), timeZone: tz }
     ev.end = { dateTime: rfc3339(endDate, endTime, tz), timeZone: tz }
@@ -176,6 +179,7 @@ export function eventToItem(ev: GEvent): ItineraryItem {
     from: core.from,
     to: core.to,
     number: core.number,
+    gate: core.gate,
     nights: core.nights,
     confirmation: core.confirmation,
     phone: core.phone,
@@ -195,7 +199,12 @@ export function eventToItem(ev: GEvent): ItineraryItem {
     item.date = s.date
     item.startTime = s.time
     item.timezone = tz
-    if (ev.end?.dateTime) item.endTime = wallInZone(ev.end.dateTime, tz).time
+    if (ev.end?.dateTime) {
+      const e = wallInZone(ev.end.dateTime, tz)
+      item.endTime = e.time
+      // Preserve a later arrival date (multi-day / crosses-midnight travel).
+      if (e.date !== s.date) item.endDate = e.date
+    }
   }
   return item
 }

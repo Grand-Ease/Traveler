@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, MapPin, Pencil, Phone, Trash2 } from 'lucide-react'
 import type { ItineraryItem } from '../types'
-import { formatTime } from '../lib/format'
+import { formatTime, parseDateOnly } from '../lib/format'
 import { deviceTimezone, tzAbbrev, tzCity } from '../lib/timezones'
 import { iconFor } from './icons'
 
@@ -16,12 +16,22 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
   const [open, setOpen] = useState(false)
   const Ico = iconFor(item)
 
+  // For travel that lands on a later date, tag the arrival time with its date.
+  const arrivalCrossesDay =
+    item.type === 'travel' && !!item.endDate && item.endDate !== item.date
+  const arrivalDateText = arrivalCrossesDay
+    ? parseDateOnly(item.endDate!).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      })
+    : ''
+  const endTimeText = formatTime(item.endTime)
+    ? `${formatTime(item.endTime)}${arrivalDateText ? ` (${arrivalDateText})` : ''}`
+    : ''
   const timeText =
     item.type === 'lodging'
       ? `${item.nights || 1} night${(item.nights || 1) > 1 ? 's' : ''}`
-      : [formatTime(item.startTime), formatTime(item.endTime)]
-          .filter(Boolean)
-          .join(' – ')
+      : [formatTime(item.startTime), endTimeText].filter(Boolean).join(' – ')
 
   // Show the destination zone whenever it differs from where the viewer is,
   // so a Paris 7pm event reads clearly even when viewed from New York.
@@ -36,7 +46,8 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.location)}`
     : undefined
 
-  const hasDetails = item.confirmation || item.phone || item.notes || item.seatsOrRoom
+  const hasDetails =
+    item.confirmation || item.phone || item.notes || item.seatsOrRoom || item.gate
 
   return (
     <div className="card">
@@ -87,6 +98,9 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
 
           {open && hasDetails && (
             <div className="mt-3 space-y-1 text-sm border-t border-white/10 pt-3">
+              {item.type === 'travel' && item.gate && (
+                <Detail label="Gate / Platform" value={item.gate} />
+              )}
               {item.seatsOrRoom && (
                 <Detail
                   label={item.type === 'lodging' ? 'Room' : 'Seats'}
