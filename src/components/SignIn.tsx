@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { asset, getClientId, getMapsKey, setClientId, setMapsKey } from '../config'
+import {
+  asset,
+  getClientId,
+  getMapsKey,
+  isClientIdFromEnv,
+  isMapsKeyFromEnv,
+  setClientId,
+  setMapsKey,
+} from '../config'
 import { signIn } from '../google/auth'
 
 interface Props {
@@ -9,7 +17,9 @@ interface Props {
 export default function SignIn({ onSignedIn }: Props) {
   const [clientId, setId] = useState(getClientId())
   const [mapsKey, setKey] = useState(getMapsKey())
-  const [needsSetup, setNeedsSetup] = useState(!getClientId())
+  // Credentials baked into the build take over; users never configure anything.
+  const managed = isClientIdFromEnv()
+  const [needsSetup, setNeedsSetup] = useState(!managed && !getClientId())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -55,17 +65,21 @@ export default function SignIn({ onSignedIn }: Props) {
             then paste it here. Stored only in this browser.
           </p>
 
-          <label className="label mt-4">Google Maps API key</label>
-          <input
-            className="field"
-            placeholder="AIza… (for automatic time zones)"
-            value={mapsKey}
-            onChange={(e) => setKey(e.target.value)}
-          />
-          <p className="text-white/40 text-xs mt-2">
-            Recommended. Enables accurate address geocoding so each item’s time zone is set
-            automatically. Without it, a keyless fallback is used.
-          </p>
+          {!isMapsKeyFromEnv() && (
+            <>
+              <label className="label mt-4">Google Maps API key</label>
+              <input
+                className="field"
+                placeholder="AIza… (for automatic time zones)"
+                value={mapsKey}
+                onChange={(e) => setKey(e.target.value)}
+              />
+              <p className="text-white/40 text-xs mt-2">
+                Recommended. Enables accurate address geocoding so each item’s time zone is set
+                automatically. Without it, a keyless fallback is used.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -73,7 +87,7 @@ export default function SignIn({ onSignedIn }: Props) {
         {busy ? 'Connecting…' : 'Sign in with Google'}
       </button>
 
-      {!needsSetup && (
+      {!needsSetup && !managed && (
         <button
           className="text-white/40 text-xs mt-3 hover:text-white/70"
           onClick={() => setNeedsSetup(true)}

@@ -15,6 +15,12 @@ export const asset = (name: string) => `${import.meta.env.BASE_URL}${name}`
 export const APP_MARKER = 'GrandEase Traveler'
 export const META_VERSION = 2
 
+/** True when a Client ID is baked into the build (VITE_GOOGLE_CLIENT_ID). */
+export function isClientIdFromEnv(): boolean {
+  const v = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
+  return !!(v && v.trim())
+}
+
 export function getClientId(): string {
   const fromEnv = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
   if (fromEnv && fromEnv.trim()) return fromEnv.trim()
@@ -28,6 +34,11 @@ export function setClientId(id: string) {
 // Google Maps Platform API key (separate from the OAuth Client ID). Used client-side
 // via the Maps JavaScript API for accurate geocoding -> automatic time zones.
 const LS_MAPS_KEY = 'grandease.googleMapsKey'
+/** True when a Maps key is baked into the build (VITE_GOOGLE_MAPS_API_KEY). */
+export function isMapsKeyFromEnv(): boolean {
+  const v = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+  return !!(v && v.trim())
+}
 export function getMapsKey(): string {
   const fromEnv = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
   if (fromEnv && fromEnv.trim()) return fromEnv.trim()

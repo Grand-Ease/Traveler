@@ -54,6 +54,13 @@ can use the app offline; queued changes sync once you're back online.
 
 ## 1. One-time Google Cloud setup (about 5 minutes)
 
+**Credentials model:** you (the owner) create *one* OAuth Client ID and *one* Maps key,
+bake them into the build once (GitHub Actions secrets, step 3), and add each traveler as a
+**test user**. After that, everyone just taps **Sign in with Google** — they never enter a
+Client ID or API key. The app auto-hides all setup fields when these are baked in. The only
+friction for test users is a one-time *"Google hasn't verified this app"* screen they click
+through (this disappears only if you complete Google's app verification for public use).
+
 You need a public **OAuth Client ID** (no client secret is used).
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create/select a project.
@@ -77,11 +84,11 @@ You need a public **OAuth Client ID** (no client secret is used).
 
 1. In the same project, **APIs & Services → Library →** enable **Maps JavaScript API**.
 2. **Credentials → Create credentials → API key.** Copy the key (`AIza…`).
-3. **Restrict** the key (recommended): under *Application restrictions* choose **Websites** and
-   add your origins (`http://localhost:5173/*`, `https://<username>.github.io/*`); under
-   *API restrictions* limit it to **Maps JavaScript API**.
-4. Paste the key in the app's first-run setup (or later via the Settings gear on the Home
-   screen). Without it, the app uses a keyless geocoder fallback.
+3. **Restrict** the key (strongly recommended, since a client-side key is visible): under
+   *Application restrictions* choose **Websites** and add your origins
+   (`http://localhost:5173/*`, `https://<username>.github.io/*`); under *API restrictions*
+   limit it to **Geocoding API** and **Maps JavaScript API**. So restricted, the exposed key
+   only works from your site. Without any key, the app uses a keyless geocoder fallback.
 
 ---
 
@@ -89,21 +96,30 @@ You need a public **OAuth Client ID** (no client secret is used).
 
 ```bash
 npm install
+cp .env.example .env.local   # then fill in your Client ID (+ optional Maps key)
 npm run dev
 ```
 
-Open http://localhost:5173, paste your Client ID once when prompted (stored in your browser),
-and sign in. Optionally create `.env.local` from `.env.example` to bake the ID in.
+Open http://localhost:5173 and sign in. With the values in `.env.local` baked in, there's no
+setup prompt. (If you leave `.env.local` empty, the app will ask for the Client ID once and
+store it in your browser — handy for quick trials.)
 
-## 3. Deploy to GitHub Pages
+## 3. Deploy to GitHub Pages (owner-managed credentials)
 
 1. Push this repo to GitHub.
-2. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
-3. (Optional) **Settings → Secrets and variables → Actions** → add `VITE_GOOGLE_CLIENT_ID`
-   to bake the Client ID into the build. If you skip this, users enter it once in-app.
-4. Every push to `main` builds and deploys via `.github/workflows/deploy.yml`.
-5. Add your Pages URL (`https://<username>.github.io/<repo>`) to the OAuth **Authorized
-   JavaScript origins** (just the origin, no path).
+2. **Settings → Secrets and variables → Actions → New repository secret** and add:
+   - `VITE_GOOGLE_CLIENT_ID` — your OAuth Client ID
+   - `VITE_GOOGLE_MAPS_API_KEY` — your Maps key (optional; omit to use the keyless fallback)
+
+   These are compiled into the static build so **users never enter anything**.
+3. The workflow (`.github/workflows/deploy.yml`) builds on every push to `main` and publishes
+   `dist/` to the **`gh-pages`** branch. In **Settings → Pages → Build and deployment**, set
+   **Source: Deploy from a branch**, branch **`gh-pages`**, folder **`/ (root)`**.
+4. Add your Pages URL origin (`https://<username>.github.io`) to the OAuth **Authorized
+   JavaScript origins**, and `https://<username>.github.io/*` to the Maps key's website
+   restriction.
+5. Add each traveler's Google email under the OAuth consent screen's **Test users**. They then
+   just sign in — no IDs, no keys.
 
 ---
 
