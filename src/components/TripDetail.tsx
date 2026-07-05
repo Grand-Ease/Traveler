@@ -33,7 +33,9 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
   const trip = useTrip(tripProp)
   const items = useItems(trip.id)
   const [filter, setFilter] = useState<Filter>('all')
-  const [dayIndex, setDayIndex] = useState(0)
+  // Track the selected day as a DATE STRING so it survives `days` recomputing
+  // (e.g. after adding an item), instead of an index that gets reset.
+  const [selectedDay, setSelectedDay] = useState('')
   const [editing, setEditing] = useState<ItineraryItem | null>(null)
   const [importing, setImporting] = useState(false)
 
@@ -63,13 +65,16 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
   }
 
   useEffect(() => {
-    // Jump to today if it's within the trip, else first day.
+    // Only pick a default day when the current selection isn't valid (initial
+    // mount, or the selected day disappeared). Otherwise keep the user's day so
+    // adding an item doesn't snap back to today/first day.
+    if (selectedDay && days.includes(selectedDay)) return
     const today = new Date().toISOString().slice(0, 10)
-    const idx = days.indexOf(today)
-    setDayIndex(idx >= 0 ? idx : 0)
-  }, [days])
+    setSelectedDay(days.includes(today) ? today : days[0])
+  }, [days, selectedDay])
 
-  const day = days[Math.min(dayIndex, days.length - 1)]
+  const day = days.includes(selectedDay) ? selectedDay : days[0]
+  const dayIndex = Math.max(0, days.indexOf(day))
   const dayItems = itemsOnDay(day)
     .filter((it) => filter === 'all' || it.type === filter)
     .sort((a, b) => (a.startTime || '99').localeCompare(b.startTime || '99'))
@@ -108,8 +113,8 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
     if (url) window.open(url, '_blank', 'noopener')
   }
 
-  const goPrev = () => setDayIndex((i) => Math.max(0, i - 1))
-  const goNext = () => setDayIndex((i) => Math.min(days.length - 1, i + 1))
+  const goPrev = () => setSelectedDay(days[Math.max(0, dayIndex - 1)])
+  const goNext = () => setSelectedDay(days[Math.min(days.length - 1, dayIndex + 1)])
 
   // Horizontal swipe anywhere on the screen navigates days.
   const touchStart = useRef<{ x: number; y: number } | null>(null)
@@ -287,10 +292,8 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
             setEditing(null)
-            if (saved.date) {
-              const idx = days.indexOf(saved.date)
-              if (idx >= 0) setDayIndex(idx)
-            }
+            // Stay on the day the item lives on (usually the current day).
+            if (saved.date) setSelectedDay(saved.date)
           }}
         />
       )}
