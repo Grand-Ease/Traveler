@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MapPin, Plus, X } from 'lucide-react'
+import { ChevronRight, MapPin, Plus, X } from 'lucide-react'
 import type { DayPlace, Trip } from '../types'
 import { activePlaceIndex, placesForDay, refTimeForDay } from '../lib/locations'
 import { timezoneForQuery } from '../lib/geo'
@@ -139,71 +139,73 @@ export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
     )
   }
 
-  // ---- read-only ----
+  // ---- read-only (centered, places side-by-side) ----
   if (!places.length) {
     return canEdit ? (
-      <button
-        onClick={() => beginEdit()}
-        className="mt-2 inline-flex items-center gap-1.5 text-white/50 hover:text-white"
-      >
-        <MapPin size={18} /> <span className="text-lg">Set destination</span>
-      </button>
+      <div className="flex justify-center">
+        <button
+          onClick={() => beginEdit()}
+          className="inline-flex items-center gap-1.5 text-white/50 hover:text-white"
+        >
+          <MapPin size={18} /> <span className="text-lg">Set destination</span>
+        </button>
+      </div>
     ) : null
   }
 
   return (
-    <div className="mt-2 flex items-start justify-between gap-2">
+    <div className="text-center">
       <div
-        className={canEdit ? 'cursor-pointer flex-1' : 'flex-1'}
+        className={`flex items-center justify-center flex-wrap gap-x-2 gap-y-1 ${
+          canEdit ? 'cursor-pointer' : ''
+        }`}
         onClick={canEdit ? () => beginEdit() : undefined}
       >
         {places.map((p, i) => {
           const isActive = i === active
           const tzTag = p.tz ? `${tzAbbrev(p.tz)} · ${tzCity(p.tz)}` : ''
           return (
-            <div key={i} className="flex items-center gap-2 leading-tight">
+            <div key={i} className="flex items-center gap-1.5">
+              {i > 0 && <ChevronRight size={16} className="text-white/30 shrink-0" />}
               <MapPin
-                size={isActive ? 20 : 14}
+                size={isActive ? 18 : 13}
                 className={isActive ? 'text-yellow-300 shrink-0' : 'text-white/40 shrink-0'}
               />
               <span
                 className={
-                  isActive
-                    ? 'text-2xl font-bold text-yellow-300'
-                    : 'text-base text-white/80'
+                  isActive ? 'text-2xl font-bold text-yellow-300' : 'text-base text-white/80'
                 }
               >
                 {p.name}
               </span>
               {places.length > 1 && (
                 <span
-                  className={isActive ? 'text-yellow-300/80 text-sm' : 'text-white/40 text-xs'}
+                  className={isActive ? 'text-yellow-300/80 text-xs' : 'text-white/40 text-xs'}
                 >
                   {formatTime(p.time)}
                 </span>
               )}
-              {tzTag && (
-                <span
-                  className={isActive ? 'text-yellow-300/70 text-xs' : 'text-white/30 text-xs'}
-                >
-                  {tzTag}
-                </span>
+              {tzTag && places.length === 1 && (
+                <span className="text-yellow-300/70 text-xs">{tzTag}</span>
               )}
             </div>
           )
         })}
-        {inherited && (
-          <p className="text-white/30 text-xs mt-0.5">carried forward · tap to change</p>
+        {canEdit && places.length < 3 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              beginEdit(true)
+            }}
+            className="shrink-0 w-7 h-7 rounded-full border border-white/15 text-teal hover:bg-white/5 flex items-center justify-center"
+            title="Add another place"
+          >
+            <Plus size={16} />
+          </button>
         )}
       </div>
-      {canEdit && places.length < 3 && (
-        <button
-          onClick={() => beginEdit(true)}
-          className="shrink-0 mt-1 w-8 h-8 rounded-full border border-white/15 text-teal hover:bg-white/5 flex items-center justify-center"
-          title="Add another place"
-        >
-          <Plus size={18} />
-        </button>
+      {inherited && (
+        <p className="text-white/30 text-xs mt-0.5">carried forward · tap to change</p>
       )}
     </div>
   )

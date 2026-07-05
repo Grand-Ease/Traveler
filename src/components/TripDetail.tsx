@@ -97,7 +97,8 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
           <SyncBadge />
         </div>
         <div className="bg-headerCard border border-white/20 rounded-2xl p-4">
-          <div className="flex items-center justify-between">
+          <DayLocations trip={trip} day={day} canEdit={canEdit} onSave={saveDayPlaces} />
+          <div className="flex items-center justify-between mt-2">
             <button
               onClick={() => setDayIndex((i) => Math.max(0, i - 1))}
               disabled={dayIndex === 0}
@@ -106,10 +107,9 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
               <ChevronLeft size={22} />
             </button>
             <div className="text-center">
-              <p className="text-white/60 text-sm">{trip.name}</p>
               <h1 className="text-xl font-bold">{weekdayLong(day)}</h1>
               <p className="text-white/50 text-xs mt-1">
-                Day {dayIndex + 1} of {days.length} · {totalDay} item
+                {trip.name} · Day {dayIndex + 1} of {days.length} · {totalDay} item
                 {totalDay === 1 ? '' : 's'}
               </p>
             </div>
@@ -121,7 +121,6 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
               <ChevronRight size={22} />
             </button>
           </div>
-          <DayLocations trip={trip} day={day} canEdit={canEdit} onSave={saveDayPlaces} />
         </div>
       </div>
 
