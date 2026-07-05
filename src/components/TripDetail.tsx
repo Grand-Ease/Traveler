@@ -4,11 +4,13 @@ import {
   ChevronRight,
   Home as HomeIcon,
   ListChecks,
+  Map as MapIcon,
   Plus,
   Sparkles,
 } from 'lucide-react'
 import type { DayPlace, ItineraryItem, ItemType, Trip } from '../types'
 import { addDays, eachDay, TYPE_LABEL, weekdayLong } from '../lib/format'
+import { directionsUrl } from '../lib/mapLinks'
 import { setDayPlaces } from '../lib/locations'
 import * as store from '../store/store'
 import { useItems, useTrip } from '../store/hooks'
@@ -72,6 +74,25 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
     .filter((it) => filter === 'all' || it.type === filter)
     .sort((a, b) => (a.startTime || '99').localeCompare(b.startTime || '99'))
 
+  // Ordered, deduped list of mappable addresses for the whole current day.
+  const mapStops = useMemo(() => {
+    const ordered = itemsOnDay(day).sort((a, b) =>
+      (a.startTime || '99').localeCompare(b.startTime || '99'),
+    )
+    const addresses: string[] = []
+    for (const it of ordered) {
+      const raw =
+        it.type === 'travel' ? it.to || it.location || it.from : it.location
+      const addr = (raw || '').trim()
+      if (!addr) continue
+      // Collapse consecutive duplicates.
+      if (addresses[addresses.length - 1] === addr) continue
+      addresses.push(addr)
+    }
+    return addresses
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, day])
+
   function removeItem(it: ItineraryItem) {
     if (!it.id) return
     if (!confirm(`Delete “${it.title}”?`)) return
@@ -80,6 +101,11 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
 
   function saveDayPlaces(places: DayPlace[]) {
     store.updateTrip({ ...trip, locations: setDayPlaces(trip, day, places) })
+  }
+
+  function openMap() {
+    const url = directionsUrl(mapStops)
+    if (url) window.open(url, '_blank', 'noopener')
   }
 
   const goPrev = () => setDayIndex((i) => Math.max(0, i - 1))
@@ -181,6 +207,22 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
               </button>
             )
           })}
+          {(() => {
+            const hasStops = mapStops.length > 0
+            return (
+              <button
+                onClick={openMap}
+                disabled={!hasStops}
+                aria-label="Map day's stops"
+                title={hasStops ? "Map day's stops" : 'No locations to map today'}
+                className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border border-white/10 text-white/70 hover:bg-white/5 ${
+                  hasStops ? '' : 'opacity-40 cursor-not-allowed'
+                }`}
+              >
+                <MapIcon size={18} />
+              </button>
+            )
+          })()}
         </div>
       </div>
 
