@@ -17,14 +17,14 @@ export default function Modal({ title, onClose, children, footer }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-0 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-lg bg-[#111] sm:rounded-2xl rounded-t-2xl border border-white/10 max-h-[92vh] flex flex-col"
+        className="w-full sm:max-w-lg bg-[#111] sm:rounded-2xl rounded-b-2xl border border-white/10 max-h-[100dvh] sm:max-h-[92vh] sm:mt-6 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between px-4 py-3 safe-top sm:pt-3 border-b border-white/10">
           <h2 className="text-lg font-semibold">{title}</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10">
             <X size={20} />
