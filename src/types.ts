@@ -65,6 +65,25 @@ export interface ItineraryItem {
   notes?: string
 }
 
+// A destination on a given day. Days carry the previous destination forward
+// until a new one is set; a day may have up to 3 places (e.g. while traveling).
+export interface DayPlace {
+  /** Start time this place becomes "current", HH:mm (24h). First is usually 00:00. */
+  time: string
+  /** Human place name, e.g. "Paris, France". */
+  name: string
+  /** IANA timezone auto-detected from the name. */
+  tz?: string
+}
+
+/** Explicitly-set destinations for one date. Stored sparsely (only set days). */
+export interface DayLocations {
+  /** YYYY-MM-DD. */
+  date: string
+  /** Places for the day, sorted by time. */
+  places: DayPlace[]
+}
+
 // A Trip is backed by a Google secondary calendar.
 export interface Trip {
   /** Google calendarId. */
@@ -79,6 +98,19 @@ export interface Trip {
   color?: string
   /** Default DESTINATION timezone for new items on this trip (IANA id). */
   timezone?: string
+  /** Per-day destinations (sparse; carry forward). */
+  locations?: DayLocations[]
+}
+
+// Compact per-day location as stored in calendar description metadata.
+interface MetaPlace {
+  t: string
+  n: string
+  z?: string
+}
+interface MetaDayLocations {
+  d: string
+  p: MetaPlace[]
 }
 
 // Marker stored in a trip calendar's description so we can find "our" calendars.
@@ -89,4 +121,6 @@ export interface TripMeta {
   end?: string
   /** Default destination timezone for the trip. */
   tz?: string
+  /** Per-day destinations (compact). */
+  loc?: MetaDayLocations[]
 }

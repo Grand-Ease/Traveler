@@ -13,7 +13,7 @@ export const asset = (name: string) => `${import.meta.env.BASE_URL}${name}`
 
 // Marker written into every trip calendar's description.
 export const APP_MARKER = 'GrandEase Traveler'
-export const META_VERSION = 1
+export const META_VERSION = 2
 
 export function getClientId(): string {
   const fromEnv = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined

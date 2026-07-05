@@ -5,9 +5,11 @@ import {
   TRAVEL_SUBTYPES,
   type ItineraryItem,
   type ItemType,
+  type Trip,
 } from '../types'
 import * as store from '../store/store'
 import { TYPE_LABEL } from '../lib/format'
+import { dayTimezone } from '../lib/locations'
 import { deviceTimezone, tzCity } from '../lib/timezones'
 import { hasLocation, timezoneForItem } from '../lib/geo'
 import { iconFor, TYPE_ICONS } from './icons'
@@ -16,13 +18,15 @@ import Modal from './Modal'
 interface Props {
   calendarId: string
   initial: ItineraryItem
+  /** Trip whose day destinations supply a default timezone. */
+  trip?: Trip
   onClose: () => void
   onSaved: (item: ItineraryItem, isNew: boolean) => void
 }
 
 const TYPES: ItemType[] = ['travel', 'lodging', 'dining', 'activity', 'note']
 
-export default function ItemForm({ calendarId, initial, onClose, onSaved }: Props) {
+export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }: Props) {
   const [item, setItem] = useState<ItineraryItem>({ ...initial })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -68,12 +72,16 @@ export default function ItemForm({ calendarId, initial, onClose, onSaved }: Prop
     setSaving(true)
     setError('')
     try {
-      // Resolve the timezone from the location before saving. When offline this
-      // may return null and we simply save without it (device tz is used).
+      // Resolve the timezone before saving. Priority: the item's own location,
+      // then the day's active destination, then whatever was already set
+      // (falling back to the device tz at render time).
       let toSave = item
       if (hasLocation(item)) {
         const tz = (await timezoneForItem(item)) || item.timezone
         toSave = { ...item, timezone: tz }
+      } else if (!item.timezone && trip) {
+        const tz = dayTimezone(trip, item.date, item.startTime)
+        if (tz) toSave = { ...item, timezone: tz }
       }
       const saved = isNew
         ? store.addItem(calendarId, toSave)

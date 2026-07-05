@@ -1,5 +1,5 @@
 import { APP_MARKER, META_VERSION } from '../config'
-import type { ItineraryItem, Trip, TripMeta } from '../types'
+import type { DayLocations, ItineraryItem, Trip, TripMeta } from '../types'
 import { eventToItem, itemToEvent, type GEvent } from '../lib/convert'
 import { getToken } from './auth'
 
@@ -31,8 +31,39 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 // ---- trip metadata stored in the calendar description ----
 
-function encodeMeta(start: string, end: string, tz?: string): string {
-  const meta: TripMeta = { grandease: 1, v: META_VERSION, start, end, tz }
+function encodeLocations(locations?: DayLocations[]): TripMeta['loc'] {
+  if (!locations || !locations.length) return undefined
+  const loc = locations
+    .filter((d) => d.places && d.places.length)
+    .map((d) => ({
+      d: d.date,
+      p: d.places.map((pl) => ({ t: pl.time, n: pl.name, ...(pl.tz ? { z: pl.tz } : {}) })),
+    }))
+  return loc.length ? loc : undefined
+}
+
+function decodeLocations(loc?: TripMeta['loc']): DayLocations[] | undefined {
+  if (!loc || !loc.length) return undefined
+  return loc.map((d) => ({
+    date: d.d,
+    places: (d.p || []).map((pl) => ({ time: pl.t, name: pl.n, tz: pl.z })),
+  }))
+}
+
+function encodeMeta(
+  start: string,
+  end: string,
+  tz?: string,
+  locations?: DayLocations[],
+): string {
+  const meta: TripMeta = {
+    grandease: 1,
+    v: META_VERSION,
+    start,
+    end,
+    tz,
+    loc: encodeLocations(locations),
+  }
   return `${APP_MARKER}\n${JSON.stringify(meta)}`
 }
 
@@ -80,6 +111,7 @@ export async function listTrips(): Promise<Trip[]> {
         accessRole: c.accessRole,
         color: c.backgroundColor,
         timezone: meta.tz,
+        locations: decodeLocations(meta.loc),
       })
     }
     pageToken = data.nextPageToken
@@ -93,10 +125,11 @@ export async function createTrip(
   start: string,
   end: string,
   tz?: string,
+  locations?: DayLocations[],
 ): Promise<Trip> {
   const cal = await api<{ id: string }>(`/calendars`, {
     method: 'POST',
-    body: JSON.stringify({ summary: name, description: encodeMeta(start, end, tz) }),
+    body: JSON.stringify({ summary: name, description: encodeMeta(start, end, tz, locations) }),
   })
   // Match the trip calendar's own timezone to the destination so native
   // calendar apps also anchor these events to that zone.
@@ -110,7 +143,15 @@ export async function createTrip(
       /* non-fatal */
     }
   }
-  return { id: cal.id, name, startDate: start, endDate: end, accessRole: 'owner', timezone: tz }
+  return {
+    id: cal.id,
+    name,
+    startDate: start,
+    endDate: end,
+    accessRole: 'owner',
+    timezone: tz,
+    locations,
+  }
 }
 
 export async function updateTrip(trip: Trip): Promise<void> {
@@ -118,7 +159,7 @@ export async function updateTrip(trip: Trip): Promise<void> {
     method: 'PATCH',
     body: JSON.stringify({
       summary: trip.name,
-      description: encodeMeta(trip.startDate, trip.endDate, trip.timezone),
+      description: encodeMeta(trip.startDate, trip.endDate, trip.timezone, trip.locations),
       ...(trip.timezone ? { timeZone: trip.timezone } : {}),
     }),
   })

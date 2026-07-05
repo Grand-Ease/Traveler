@@ -7,14 +7,16 @@ import {
   Plus,
   Sparkles,
 } from 'lucide-react'
-import type { ItineraryItem, ItemType, Trip } from '../types'
+import type { DayPlace, ItineraryItem, ItemType, Trip } from '../types'
 import { addDays, eachDay, TYPE_LABEL, weekdayLong } from '../lib/format'
+import { setDayPlaces } from '../lib/locations'
 import * as store from '../store/store'
-import { useItems } from '../store/hooks'
+import { useItems, useTrip } from '../store/hooks'
 import { TYPE_ICONS } from './icons'
 import ItemCard from './ItemCard'
 import ItemForm from './ItemForm'
 import ImportModal from './ImportModal'
+import DayLocations from './DayLocations'
 import SyncBadge from './SyncBadge'
 
 interface Props {
@@ -25,7 +27,8 @@ interface Props {
 type Filter = 'all' | ItemType
 const FILTERS: Filter[] = ['all', 'travel', 'lodging', 'dining', 'activity', 'note']
 
-export default function TripDetail({ trip, onBack }: Props) {
+export default function TripDetail({ trip: tripProp, onBack }: Props) {
+  const trip = useTrip(tripProp)
   const items = useItems(trip.id)
   const [filter, setFilter] = useState<Filter>('all')
   const [dayIndex, setDayIndex] = useState(0)
@@ -75,6 +78,10 @@ export default function TripDetail({ trip, onBack }: Props) {
     store.deleteItem(trip.id, it.id)
   }
 
+  function saveDayPlaces(places: DayPlace[]) {
+    store.updateTrip({ ...trip, locations: setDayPlaces(trip, day, places) })
+  }
+
   function startAdd() {
     const type: ItemType = filter === 'all' ? 'activity' : filter
     setEditing({ type, title: '', date: day })
@@ -114,6 +121,7 @@ export default function TripDetail({ trip, onBack }: Props) {
               <ChevronRight size={22} />
             </button>
           </div>
+          <DayLocations trip={trip} day={day} canEdit={canEdit} onSave={saveDayPlaces} />
         </div>
       </div>
 
@@ -195,6 +203,7 @@ export default function TripDetail({ trip, onBack }: Props) {
       {editing && (
         <ItemForm
           calendarId={trip.id}
+          trip={trip}
           initial={editing}
           onClose={() => setEditing(null)}
           onSaved={(saved) => {

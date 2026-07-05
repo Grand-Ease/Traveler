@@ -9,7 +9,7 @@
 // is attempted. On sync we flush the queue (remapping temp IDs -> real IDs)
 // and then pull fresh server state.
 
-import type { ItineraryItem, Trip } from '../types'
+import type { DayLocations, ItineraryItem, Trip } from '../types'
 import * as api from '../google/calendar'
 
 // ---------- persistence ----------
@@ -38,8 +38,24 @@ function writeJSON(key: string, value: unknown) {
 // ---------- queued operations ----------
 
 type Op =
-  | { kind: 'trip.create'; tempId: string; name: string; start: string; end: string; tries?: number }
-  | { kind: 'trip.update'; id: string; name: string; start: string; end: string; tries?: number }
+  | {
+      kind: 'trip.create'
+      tempId: string
+      name: string
+      start: string
+      end: string
+      locations?: DayLocations[]
+      tries?: number
+    }
+  | {
+      kind: 'trip.update'
+      id: string
+      name: string
+      start: string
+      end: string
+      locations?: DayLocations[]
+      tries?: number
+    }
   | { kind: 'trip.delete'; id: string; owned: boolean; tries?: number }
   | { kind: 'item.add'; calendarId: string; tempId: string; item: ItineraryItem; tries?: number }
   | { kind: 'item.update'; calendarId: string; item: ItineraryItem; tries?: number }
@@ -137,6 +153,7 @@ export function updateTrip(trip: Trip): void {
     create.name = trip.name
     create.start = trip.startDate
     create.end = trip.endDate
+    create.locations = trip.locations
   } else {
     queue = queue.filter((o) => !(o.kind === 'trip.update' && o.id === id))
     queue.push({
@@ -145,6 +162,7 @@ export function updateTrip(trip: Trip): void {
       name: trip.name,
       start: trip.startDate,
       end: trip.endDate,
+      locations: trip.locations,
     })
   }
   persistQueue()
@@ -269,7 +287,7 @@ function mapId(tempId: string, realId: string) {
 async function applyOp(op: Op): Promise<void> {
   switch (op.kind) {
     case 'trip.create': {
-      const t = await api.createTrip(op.name, op.start, op.end)
+      const t = await api.createTrip(op.name, op.start, op.end, undefined, op.locations)
       // Migrate cached items from the temp calendar id to the real one.
       const temp = loadItems(op.tempId)
       if (temp.length) {
@@ -290,6 +308,7 @@ async function applyOp(op: Op): Promise<void> {
         startDate: op.start,
         endDate: op.end,
         accessRole: 'owner',
+        locations: op.locations,
       })
       break
     case 'trip.delete':
