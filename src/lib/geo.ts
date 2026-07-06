@@ -10,6 +10,7 @@ import { loadGoogleMaps } from './googleMaps'
 // Results are cached in localStorage.
 
 const CACHE_KEY = 'grandease.geoTzCache'
+const COORD_CACHE_KEY = 'grandease.geoCoordCache'
 const NOMINATIM = 'https://nominatim.openstreetmap.org/search'
 
 type Cache = Record<string, string | null>
@@ -24,6 +25,24 @@ function loadCache(): Cache {
 function saveCache(c: Cache) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(c))
+  } catch {
+    /* ignore quota */
+  }
+}
+
+type Coords = { lat: number; lon: number }
+type CoordCache = Record<string, Coords | null>
+
+function loadCoordCache(): CoordCache {
+  try {
+    return JSON.parse(localStorage.getItem(COORD_CACHE_KEY) || '{}')
+  } catch {
+    return {}
+  }
+}
+function saveCoordCache(c: CoordCache) {
+  try {
+    localStorage.setItem(COORD_CACHE_KEY, JSON.stringify(c))
   } catch {
     /* ignore quota */
   }
@@ -66,6 +85,21 @@ async function geocodeNominatim(
   return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) }
 }
 
+/**
+ * Resolve a location string to coordinates, using Google (when a Maps key is
+ * configured) and falling back to Nominatim. Throws on failure so callers can
+ * decide how to cache / recover.
+ */
+async function geocodeResolve(q: string): Promise<Coords | null> {
+  try {
+    return getMapsKey() ? await geocodeGoogle(q) : await geocodeNominatim(q)
+  } catch {
+    // Google failed (bad key, quota, etc.) — try the keyless fallback once.
+    if (getMapsKey()) return await geocodeNominatim(q)
+    throw new Error('geocode failed')
+  }
+}
+
 /** Resolve a single location string to an IANA timezone (or null if unknown). */
 export async function timezoneForQuery(query: string): Promise<string | null> {
   const q = query.trim()
@@ -75,27 +109,35 @@ export async function timezoneForQuery(query: string): Promise<string | null> {
   if (key in cache) return cache[key]
 
   try {
-    const coords = getMapsKey()
-      ? await geocodeGoogle(q)
-      : await geocodeNominatim(q)
+    const coords = await geocodeResolve(q)
     const tz = coords ? tzFromLatLon(coords.lat, coords.lon) : null
     cache[key] = tz
     saveCache(cache)
     return tz
   } catch {
-    // Google failed (bad key, quota, etc.) — try the keyless fallback once.
-    if (getMapsKey()) {
-      try {
-        const coords = await geocodeNominatim(q)
-        const tz = coords ? tzFromLatLon(coords.lat, coords.lon) : null
-        cache[key] = tz
-        saveCache(cache)
-        return tz
-      } catch {
-        /* fall through */
-      }
-    }
     return null // caller falls back to device tz
+  }
+}
+
+/**
+ * Resolve a single location string to coordinates (or null if unknown).
+ * Mirrors `timezoneForQuery`: a dedicated localStorage cache (including null
+ * results) backs Google geocoding with a Nominatim fallback.
+ */
+export async function geocodeToCoords(query: string): Promise<Coords | null> {
+  const q = query.trim()
+  if (!q) return null
+  const key = q.toLowerCase()
+  const cache = loadCoordCache()
+  if (key in cache) return cache[key]
+
+  try {
+    const coords = await geocodeResolve(q)
+    cache[key] = coords
+    saveCoordCache(cache)
+    return coords
+  } catch {
+    return null
   }
 }
 

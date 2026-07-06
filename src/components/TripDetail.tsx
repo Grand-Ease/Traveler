@@ -3,18 +3,22 @@ import {
   ChevronLeft,
   ChevronRight,
   Home as HomeIcon,
-  ListChecks,
+  LayoutGrid,
+  List as ListIcon,
   Map as MapIcon,
+  PlaneLanding,
+  PlaneTakeoff,
   Plus,
   Sparkles,
+  type LucideIcon,
 } from 'lucide-react'
 import type { DayPlace, ItineraryItem, ItemType, Trip } from '../types'
 import { addDays, eachDay, TYPE_LABEL, weekdayLong } from '../lib/format'
-import { directionsUrl } from '../lib/mapLinks'
 import { setDayPlaces } from '../lib/locations'
 import * as store from '../store/store'
 import { useItems, useTrip } from '../store/hooks'
 import { TYPE_ICONS } from './icons'
+import DayMap, { type MapCat } from './DayMap'
 import ItemCard from './ItemCard'
 import ItemForm from './ItemForm'
 import ImportModal from './ImportModal'
@@ -29,10 +33,38 @@ interface Props {
 type Filter = 'all' | ItemType
 const FILTERS: Filter[] = ['all', 'travel', 'lodging', 'dining', 'activity', 'note']
 
+// Map-mode multi-toggle categories (travel is split into departure/arrival).
+const MAP_CATS: MapCat[] = ['departure', 'arrival', 'lodging', 'dining', 'activity', 'note']
+const MAP_CAT_ICON: Record<MapCat, LucideIcon> = {
+  departure: PlaneTakeoff,
+  arrival: PlaneLanding,
+  lodging: TYPE_ICONS.lodging,
+  dining: TYPE_ICONS.dining,
+  activity: TYPE_ICONS.activity,
+  note: TYPE_ICONS.note,
+}
+const MAP_CAT_LABEL: Record<MapCat, string> = {
+  departure: 'Departure',
+  arrival: 'Arrival',
+  lodging: 'Lodging',
+  dining: 'Dining',
+  activity: 'Activity',
+  note: 'Note',
+}
+
 export default function TripDetail({ trip: tripProp, onBack }: Props) {
   const trip = useTrip(tripProp)
   const items = useItems(trip.id)
   const [filter, setFilter] = useState<Filter>('all')
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
+  const [mapCats, setMapCats] = useState<Record<MapCat, boolean>>({
+    departure: true,
+    arrival: true,
+    lodging: true,
+    dining: true,
+    activity: true,
+    note: true,
+  })
   // Track the selected day as a DATE STRING so it survives `days` recomputing
   // (e.g. after adding an item), instead of an index that gets reset.
   const [selectedDay, setSelectedDay] = useState('')
@@ -79,24 +111,12 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
     .filter((it) => filter === 'all' || it.type === filter)
     .sort((a, b) => (a.startTime || '99').localeCompare(b.startTime || '99'))
 
-  // Ordered, deduped list of mappable addresses for the whole current day.
-  const mapStops = useMemo(() => {
-    const ordered = itemsOnDay(day).sort((a, b) =>
-      (a.startTime || '99').localeCompare(b.startTime || '99'),
-    )
-    const addresses: string[] = []
-    for (const it of ordered) {
-      const raw =
-        it.type === 'travel' ? it.to || it.location || it.from : it.location
-      const addr = (raw || '').trim()
-      if (!addr) continue
-      // Collapse consecutive duplicates.
-      if (addresses[addresses.length - 1] === addr) continue
-      addresses.push(addr)
-    }
-    return addresses
+  // The whole day's items (map uses these, independent of the list filter).
+  const allDayItems = useMemo(
+    () => itemsOnDay(day),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, day])
+    [items, day],
+  )
 
   function removeItem(it: ItineraryItem) {
     if (!it.id) return
@@ -106,11 +126,6 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
 
   function saveDayPlaces(places: DayPlace[]) {
     store.updateTrip({ ...trip, locations: setDayPlaces(trip, day, places) })
-  }
-
-  function openMap() {
-    const url = directionsUrl(mapStops)
-    if (url) window.open(url, '_blank', 'noopener')
   }
 
   const goPrev = () => setSelectedDay(days[Math.max(0, dayIndex - 1)])
@@ -153,8 +168,10 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
   return (
     <div
       className="flex flex-col h-full max-w-2xl mx-auto w-full"
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
+      // Scope day-swipe to list mode so the map keeps full control of its own
+      // drag/zoom gestures.
+      onTouchStart={viewMode === 'list' ? onTouchStart : undefined}
+      onTouchEnd={viewMode === 'list' ? onTouchEnd : undefined}
     >
       {/* Header (fixed, does not scroll) */}
       <div className="shrink-0">
@@ -190,20 +207,20 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
           </div>
         </div>
 
-        {/* Category filter (icon-only) */}
+        {/* View toggle + category filter (icon-only) */}
         <div className="flex gap-2 px-4 py-3">
-          {FILTERS.map((f) => {
-            const active = filter === f
-            const Ico = f === 'all' ? ListChecks : TYPE_ICONS[f]
-            const label = f === 'all' ? 'All' : TYPE_LABEL[f]
+          {/* Leftmost chip: List <-> Map view toggle */}
+          {(() => {
+            const isMap = viewMode === 'map'
+            const Ico = isMap ? ListIcon : MapIcon
+            const label = isMap ? 'Show list' : 'Show map'
             return (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => setViewMode(isMap ? 'list' : 'map')}
                 aria-label={label}
                 title={label}
                 className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border ${
-                  active
+                  isMap
                     ? 'bg-teal text-white border-teal'
                     : 'border-white/15 text-white/60 hover:bg-white/5'
                 }`}
@@ -211,48 +228,81 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
                 <Ico size={18} />
               </button>
             )
-          })}
-          {(() => {
-            const hasStops = mapStops.length > 0
-            return (
-              <button
-                onClick={openMap}
-                disabled={!hasStops}
-                aria-label="Map day's stops"
-                title={hasStops ? "Map day's stops" : 'No locations to map today'}
-                className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border border-white/10 text-white/70 hover:bg-white/5 ${
-                  hasStops ? '' : 'opacity-40 cursor-not-allowed'
-                }`}
-              >
-                <MapIcon size={18} />
-              </button>
-            )
           })()}
+
+          {viewMode === 'list'
+            ? FILTERS.map((f) => {
+                const active = filter === f
+                const Ico = f === 'all' ? LayoutGrid : TYPE_ICONS[f]
+                const label = f === 'all' ? 'All' : TYPE_LABEL[f]
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    aria-label={label}
+                    title={label}
+                    className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border ${
+                      active
+                        ? 'bg-teal text-white border-teal'
+                        : 'border-white/15 text-white/60 hover:bg-white/5'
+                    }`}
+                  >
+                    <Ico size={18} />
+                  </button>
+                )
+              })
+            : MAP_CATS.map((c) => {
+                const active = mapCats[c]
+                const Ico = MAP_CAT_ICON[c]
+                const label = MAP_CAT_LABEL[c]
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setMapCats((m) => ({ ...m, [c]: !m[c] }))}
+                    aria-label={label}
+                    title={label}
+                    className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border ${
+                      active
+                        ? 'bg-teal text-white border-teal'
+                        : 'border-white/15 text-white/40 hover:bg-white/5'
+                    }`}
+                  >
+                    <Ico size={18} />
+                  </button>
+                )
+              })}
         </div>
       </div>
 
-      {/* Items (only this region scrolls vertically) */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-        {dayItems.length === 0 && (
-          <div className="text-center py-16 text-white/40">
-            <p>Nothing planned{filter === 'all' ? '' : ` for ${TYPE_LABEL[filter as ItemType]}`} on this day.</p>
-            {canEdit && (
-              <button className="btn-primary mt-4" onClick={startAdd}>
-                Add something
-              </button>
-            )}
-          </div>
-        )}
-        {dayItems.map((it) => (
-          <ItemCard
-            key={it.id}
-            item={it}
-            canEdit={canEdit}
-            onEdit={() => setEditing(it)}
-            onDelete={() => removeItem(it)}
-          />
-        ))}
-      </div>
+      {viewMode === 'map' ? (
+        /* Map fills the middle region and manages its own gestures. */
+        <div className="flex-1 min-h-0">
+          <DayMap items={allDayItems} cats={mapCats} />
+        </div>
+      ) : (
+        /* Items (only this region scrolls vertically) */
+        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+          {dayItems.length === 0 && (
+            <div className="text-center py-16 text-white/40">
+              <p>Nothing planned{filter === 'all' ? '' : ` for ${TYPE_LABEL[filter as ItemType]}`} on this day.</p>
+              {canEdit && (
+                <button className="btn-primary mt-4" onClick={startAdd}>
+                  Add something
+                </button>
+              )}
+            </div>
+          )}
+          {dayItems.map((it) => (
+            <ItemCard
+              key={it.id}
+              item={it}
+              canEdit={canEdit}
+              onEdit={() => setEditing(it)}
+              onDelete={() => removeItem(it)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Bottom bar (fixed, does not scroll) */}
       <div className="shrink-0 border-t border-white/10 bg-black">
