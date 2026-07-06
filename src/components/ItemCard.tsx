@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, MapPin, Pencil, Phone, Trash2 } from 'lucide-react'
 import type { ItineraryItem } from '../types'
 import { formatTime, parseDateOnly } from '../lib/format'
-import { deviceTimezone, tzAbbrev, tzCity } from '../lib/timezones'
+import { deviceTimezone, tzAbbrev } from '../lib/timezones'
 import { iconFor } from './icons'
 
 interface Props {
@@ -40,7 +40,7 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
     item.type !== 'lodging' &&
     !!item.timezone &&
     item.timezone !== deviceTimezone
-  const tzText = showTz ? `${tzAbbrev(item.timezone!)} · ${tzCity(item.timezone!)}` : ''
+  const tzText = showTz ? tzAbbrev(item.timezone!) : ''
 
   const mapsUrl = item.location
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.location)}`

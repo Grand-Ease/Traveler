@@ -10,7 +10,7 @@ import {
 import * as store from '../store/store'
 import { TYPE_LABEL } from '../lib/format'
 import { dayTimezone } from '../lib/locations'
-import { deviceTimezone, tzCity } from '../lib/timezones'
+import { deviceTimezone, tzAbbrev } from '../lib/timezones'
 import { hasLocation, timezoneForItem } from '../lib/geo'
 import { iconFor, TYPE_ICONS } from './icons'
 import Modal from './Modal'
@@ -315,12 +315,12 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
               <span className="text-white/50">Detecting time zone from location…</span>
             ) : detectedTz ? (
               <span className="text-teal/90">
-                Time zone: {tzCity(detectedTz)} — set automatically from the location.
+                Time zone: {tzAbbrev(detectedTz)} — set automatically from the location.
               </span>
             ) : hasLocation(item) ? (
               <span className="text-amber-400/90">
                 Couldn’t detect a time zone. Add a city/country; otherwise your device time
-                ({tzCity(deviceTimezone)}) is used.
+                ({tzAbbrev(deviceTimezone)}) is used.
               </span>
             ) : (
               <span className="text-white/40">
