@@ -5,18 +5,22 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Publishes the built site to the gh-pages branch. This branch-based deploy
-# avoids the actions/deploy-pages "github-pages" environment pipeline, which was
-# consistently returning "deployment_failed" with no diagnostics for this repo.
+# Deploy via GitHub's native Pages Actions pipeline (build_type: workflow).
+# This is the single, controlled deploy path — it avoids the separate legacy
+# "pages build and deployment" auto-build that was intermittently returning
+# "Deployment failed, try again later".
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
+# Allow one concurrent deployment; don't cancel an in-progress publish.
 concurrency:
-  group: pages-deploy
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -31,9 +35,17 @@ jobs:
           # If unset, users enter them once in the app (stored in their browser).
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-      - uses: peaceiris/actions-gh-pages@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          # Ensures GitHub serves the files as-is (no Jekyll processing).
-          enable_jekyll: false
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
