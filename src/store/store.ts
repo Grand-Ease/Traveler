@@ -72,6 +72,34 @@ const itemsCache = new Map<string, ItineraryItem[]>()
 let queue: Op[] = readJSON<Op[]>(K_QUEUE, [])
 let idMap: Record<string, string> = readJSON<Record<string, string>>(K_IDMAP, {})
 
+// One-time cleanup for the pre-Supabase format: ids used to be `tmp_`-prefixed
+// placeholders, but they're now bare UUIDs. Any leftover `tmp_` entry in the
+// persisted queue/idMap is an invalid `uuid` that would fail server-side
+// forever (then get dropped as a poison op), so discard them up front.
+function opRefsTmpId(op: Op): boolean {
+  if ('tempId' in op && op.tempId.startsWith('tmp_')) return true
+  if ('id' in op && op.id.startsWith('tmp_')) return true
+  if ('calendarId' in op && op.calendarId.startsWith('tmp_')) return true
+  if ((op.kind === 'item.add' || op.kind === 'item.update') && op.item.id?.startsWith('tmp_'))
+    return true
+  return false
+}
+;(function dropLegacyTmpEntries() {
+  const cleanedQueue = queue.filter((op) => !opRefsTmpId(op))
+  if (cleanedQueue.length !== queue.length) {
+    queue = cleanedQueue
+    writeJSON(K_QUEUE, queue)
+  }
+  let idMapChanged = false
+  for (const key of Object.keys(idMap)) {
+    if (key.startsWith('tmp_') || idMap[key].startsWith('tmp_')) {
+      delete idMap[key]
+      idMapChanged = true
+    }
+  }
+  if (idMapChanged) writeJSON(K_IDMAP, idMap)
+})()
+
 let syncing = false
 let lastError: string | undefined
 let lastSyncedAt: number | undefined = undefined
@@ -123,6 +151,16 @@ export interface SyncStatus {
 }
 export function getStatus(): SyncStatus {
   return { online: isOnline(), pending: queue.length, syncing, lastError, lastSyncedAt }
+}
+
+/**
+ * True when the trip only exists in the local mutation queue — i.e. its
+ * `trip.create` op hasn't been flushed to the server yet, so it has no row in
+ * Postgres. Server-side operations (like inviting members) would fail until it
+ * syncs.
+ */
+export function isTripPending(tripId: string): boolean {
+  return queue.some((o) => o.kind === 'trip.create' && o.tempId === tripId)
 }
 
 // ---------- reads ----------

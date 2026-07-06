@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Trip } from '../types'
 import { listShares, shareTrip, unshareTrip, type Share } from '../supabase/data'
-import { isOnline } from '../store/store'
+import { isOnline, isTripPending } from '../store/store'
 import Modal from './Modal'
 
 interface Props {
@@ -24,7 +24,11 @@ export default function ShareModal({ trip, onClose }: Props) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const online = isOnline()
-  const canManage = trip.accessRole === 'owner' && online
+  // A trip that hasn't synced to the server yet has no Postgres row, so
+  // invite_member would fail with an owner-permission error. Block sharing
+  // until it syncs.
+  const pending = isTripPending(trip.id)
+  const canManage = trip.accessRole === 'owner' && online && !pending
 
   async function refresh() {
     try {
@@ -79,6 +83,10 @@ export default function ShareModal({ trip, onClose }: Props) {
       {!online ? (
         <p className="text-white/60 text-sm">
           Sharing needs an internet connection. Reconnect to invite people.
+        </p>
+      ) : pending ? (
+        <p className="text-white/60 text-sm">
+          Save &amp; sync this trip before sharing — you’re offline or it hasn’t synced yet.
         </p>
       ) : trip.accessRole !== 'owner' ? (
         <p className="text-white/60 text-sm">

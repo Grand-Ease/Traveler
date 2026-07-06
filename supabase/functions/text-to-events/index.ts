@@ -30,21 +30,16 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-// ---- naive per-user rate limiting -------------------------------------------
-// NOTE: this is an in-memory stub. It resets on cold start and is not shared
-// across function instances. For production, back this with a durable store
-// (e.g. a Postgres table or Upstash Redis).
-const RATE_LIMIT = 20 // requests
-const RATE_WINDOW_MS = 60_000 // per minute
-const hits = new Map<string, number[]>()
+// ---- durable per-user daily rate limiting -----------------------------------
+// Backed by the ai_usage table + check_and_bump_ai_usage RPC (migration
+// 0002_ai_usage.sql) so the limit survives cold starts and is shared across
+// instances. Default 50 requests/day, overridable via GEMINI_DAILY_LIMIT.
+const DAILY_LIMIT = Number(Deno.env.get('GEMINI_DAILY_LIMIT') ?? '50')
 
-function rateLimited(userId: string): boolean {
-  const now = Date.now()
-  const recent = (hits.get(userId) ?? []).filter((t) => now - t < RATE_WINDOW_MS)
-  recent.push(now)
-  hits.set(userId, recent)
-  return recent.length > RATE_LIMIT
-}
+// Reject absurdly large inputs before spending a Gemini call. Also caps the
+// number of items we return.
+const MAX_INPUT_CHARS = 20_000
+const MAX_ITEMS = 100
 
 // ---- Gemini structured-output schema (mirrors ItineraryItem) ----------------
 const responseSchema = {
@@ -132,10 +127,6 @@ Deno.serve(async (req) => {
     return json({ items: [], errors: ['Unauthorized.'] }, 401)
   }
 
-  if (rateLimited(user.id)) {
-    return json({ items: [], errors: ['Rate limit exceeded. Try again in a minute.'] }, 429)
-  }
-
   // ---- parse body ----
   let text = ''
   let ctx: Ctx = {}
@@ -147,6 +138,26 @@ Deno.serve(async (req) => {
     return json({ items: [], errors: ['Invalid JSON body.'] }, 400)
   }
   if (!text) return json({ items: [], errors: ['No text provided.'] }, 400)
+
+  // ---- input cap: reject oversized text BEFORE spending a Gemini call ----
+  if (text.length > MAX_INPUT_CHARS) {
+    return json(
+      { items: [], errors: [`Text is too long (max ${MAX_INPUT_CHARS} characters).`] },
+      413,
+    )
+  }
+
+  // ---- durable rate limit: bump the caller's daily usage (auth.uid() from the
+  // forwarded bearer token) and reject once over the cap. ----
+  const { data: underLimit, error: usageError } = await supabase.rpc('check_and_bump_ai_usage', {
+    p_limit: DAILY_LIMIT,
+  })
+  if (usageError) {
+    return json({ items: [], errors: ['Could not verify usage limit.'] }, 500)
+  }
+  if (underLimit === false) {
+    return json({ items: [], errors: ['Daily AI limit reached'] }, 429)
+  }
 
   const geminiKey = Deno.env.get('GEMINI_API_KEY')
   if (!geminiKey) {
@@ -186,7 +197,7 @@ Deno.serve(async (req) => {
     } catch {
       return json({ items: [], errors: ['Model returned unparseable output.'] }, 502)
     }
-    const arr = Array.isArray(items) ? items : []
+    const arr = (Array.isArray(items) ? items : []).slice(0, MAX_ITEMS)
     return json({ items: arr })
   } catch (e) {
     return json({ items: [], errors: [`Request failed: ${(e as Error).message}`] }, 502)
