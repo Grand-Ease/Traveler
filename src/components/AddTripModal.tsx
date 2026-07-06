@@ -77,9 +77,8 @@ export default function AddTripModal({ edit, onClose, onSaved }: Props) {
         </div>
         {!edit && (
           <p className="text-white/40 text-xs">
-            This creates a dedicated Google Calendar for the trip. Share it to let others
-            view and edit the itinerary. Each item’s time zone is set automatically from its
-            location.
+            Create a trip, then share it by email to let others view and edit the itinerary.
+            Each item’s time zone is set automatically from its location.
           </p>
         )}
         {error && <p className="text-red-400 text-sm">{error}</p>}

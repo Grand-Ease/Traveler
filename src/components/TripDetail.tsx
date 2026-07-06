@@ -350,6 +350,8 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
       {importing && (
         <ImportModal
           calendarId={trip.id}
+          trip={trip}
+          day={day}
           onClose={() => setImporting(false)}
           onImported={() => setImporting(false)}
         />

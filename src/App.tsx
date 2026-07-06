@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Trip } from './types'
-import { getToken, hasSignedInBefore, hasValidToken } from './google/auth'
-import { getClientId } from './config'
+import { supabase } from './supabase/client'
 import SignIn from './components/SignIn'
 import Home from './components/Home'
 import TripDetail from './components/TripDetail'
@@ -15,38 +14,39 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
 
   useEffect(() => {
-    // Session restore on load. Critically, this NEVER opens an OAuth popup:
-    // iOS blocks popups not tied to a user gesture, which would hang the app on
-    // the splash screen. Interactive sign-in only happens from the button tap.
-    async function restore() {
-      if (!getClientId()) return setChecking(false) // first-run setup
-      if (hasValidToken()) {
-        setAuthed(true)
-        return setChecking(false)
+    let mounted = true
+
+    // getSession() reads the persisted session locally (no network), so
+    // returning users — including offline — are authed instantly without a
+    // hang on the splash screen.
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return
+      setAuthed(!!data.session)
+      setChecking(false)
+    })
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return
+      setAuthed(!!session)
+      setChecking(false)
+      // On a fresh sign-in, turn any pending email invites into memberships.
+      if (event === 'SIGNED_IN' && session) {
+        supabase.rpc('claim_invites').then(
+          () => {},
+          () => {},
+        )
       }
-      // Offline returning user: enter with cached data; sync when back online.
-      if (!navigator.onLine && hasSignedInBefore()) {
-        setAuthed(true)
-        return setChecking(false)
-      }
-      // Online: attempt a SILENT token refresh (no popup, times out fast).
-      // If it can't (first sign-in, or iOS blocks the silent iframe), fall
-      // back to the sign-in screen where a tap can open the popup.
-      try {
-        await getToken()
-        setAuthed(true)
-      } catch {
-        /* needs interactive sign-in via the button */
-      } finally {
-        setChecking(false)
-      }
+    })
+
+    return () => {
+      mounted = false
+      sub.subscription.unsubscribe()
     }
-    restore()
   }, [])
 
   if (checking) return <Splash />
 
-  if (!authed) return <SignIn onSignedIn={() => setAuthed(true)} />
+  if (!authed) return <SignIn />
 
   if (screen.name === 'trip')
     return <TripDetail trip={screen.trip} onBack={() => setScreen({ name: 'home' })} />

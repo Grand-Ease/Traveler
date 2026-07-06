@@ -1,16 +1,20 @@
 // Offline-first data layer.
 //
-// Google Calendar is the source of truth. This store keeps a local cache
+// Supabase (Postgres) is the source of truth. This store keeps a local cache
 // (localStorage) so the app is instant and works offline, and a queue of
-// pending mutations that are flushed to Google when connectivity returns.
+// pending mutations that are flushed to Supabase when connectivity returns.
 //
 // UI reads from the cache synchronously and subscribes to changes; every
 // mutation is applied optimistically to the cache and enqueued, then a sync
-// is attempted. On sync we flush the queue (remapping temp IDs -> real IDs)
-// and then pull fresh server state.
+// is attempted. On sync we flush the queue and then pull fresh server state.
+//
+// Locally-created ids are real UUIDs (crypto.randomUUID) inserted verbatim on
+// the server, so local id == server id and the idMap remap is effectively a
+// no-op — but it's kept intact for backwards compatibility with any queued
+// legacy `tmp_`-prefixed ids still in a user's localStorage.
 
 import type { DayLocations, ItineraryItem, Trip } from '../types'
-import * as api from '../google/calendar'
+import * as api from '../supabase/data'
 
 // ---------- persistence ----------
 
@@ -83,8 +87,10 @@ export function subscribe(fn: () => void): () => void {
 
 // ---------- helpers ----------
 
+// Mint a real UUID that is inserted verbatim on the server (local id ==
+// server id). Falls back to a random string only on ancient browsers.
 const uid = () =>
-  'tmp_' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random())
+  crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random()
 const resolve = (id: string) => idMap[id] || id
 export const isOnline = () => navigator.onLine
 
@@ -287,7 +293,8 @@ function mapId(tempId: string, realId: string) {
 async function applyOp(op: Op): Promise<void> {
   switch (op.kind) {
     case 'trip.create': {
-      const t = await api.createTrip(op.name, op.start, op.end, undefined, op.locations)
+      // Insert with the client-minted UUID so local id == server id.
+      const t = await api.createTrip(op.name, op.start, op.end, undefined, op.locations, op.tempId)
       // Migrate cached items from the temp calendar id to the real one.
       const temp = loadItems(op.tempId)
       if (temp.length) {
@@ -320,9 +327,9 @@ async function applyOp(op: Op): Promise<void> {
       break
     case 'item.add': {
       const calId = resolve(op.calendarId)
-      const { id: _drop, ...body } = op.item
-      void _drop
-      const saved = await api.addItem(calId, body as ItineraryItem)
+      // Insert with the client-minted UUID (op.tempId === op.item.id) so
+      // local id == server id.
+      const saved = await api.addItem(calId, op.item)
       const list = loadItems(calId).map((i) => (i.id === op.tempId ? saved : i))
       itemsCache.set(calId, list)
       persistItems(calId)

@@ -1,5 +1,5 @@
 // Core data model for GrandEase Traveler (web).
-// A Trip == one Google Calendar. An itinerary Item == one Calendar event.
+// A Trip is a `trips` row in Supabase; an itinerary Item is an `items` row.
 
 export type ItemType = 'travel' | 'lodging' | 'dining' | 'activity' | 'note'
 
@@ -33,7 +33,7 @@ export type ActivitySubtype = (typeof ACTIVITY_SUBTYPES)[number]
 
 // A single itinerary item. This flat shape is ALSO the LLM import schema.
 export interface ItineraryItem {
-  /** Google Calendar event id (absent for not-yet-saved items). */
+  /** Item id (UUID; absent for not-yet-saved items). */
   id?: string
   type: ItemType
   /** Carrier / hotel / restaurant / activity provider / note title. */
@@ -88,43 +88,20 @@ export interface DayLocations {
   places: DayPlace[]
 }
 
-// A Trip is backed by a Google secondary calendar.
+// A Trip is a `trips` row in Supabase.
 export interface Trip {
-  /** Google calendarId. */
+  /** Trip UUID. */
   id: string
   name: string
-  /** YYYY-MM-DD, may be derived/stored in calendar description. */
+  /** YYYY-MM-DD. */
   startDate: string
   endDate: string
-  /** Access role from calendarList: "owner" | "writer" | "reader". */
+  /** Derived access role: "owner" | "writer" | "reader" (canEdit = !== "reader"). */
   accessRole: string
-  /** Calendar color (hex) if available. */
+  /** Optional color (hex) if available. */
   color?: string
   /** Default DESTINATION timezone for new items on this trip (IANA id). */
   timezone?: string
   /** Per-day destinations (sparse; carry forward). */
   locations?: DayLocations[]
-}
-
-// Compact per-day location as stored in calendar description metadata.
-interface MetaPlace {
-  t: string
-  n: string
-  z?: string
-}
-interface MetaDayLocations {
-  d: string
-  p: MetaPlace[]
-}
-
-// Marker stored in a trip calendar's description so we can find "our" calendars.
-export interface TripMeta {
-  grandease: 1
-  v: number
-  start?: string
-  end?: string
-  /** Default destination timezone for the trip. */
-  tz?: string
-  /** Per-day destinations (compact). */
-  loc?: MetaDayLocations[]
 }

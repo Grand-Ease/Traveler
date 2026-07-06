@@ -31,9 +31,10 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          # Optional: set repo secrets to bake these into the build.
-          # If unset, users enter them once in the app (stored in their browser).
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          # Supabase config baked into the client build (both are public).
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Optional: Maps key for accurate geocoding -> time zones.
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

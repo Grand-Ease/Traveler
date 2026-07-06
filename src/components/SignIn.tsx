@@ -1,41 +1,44 @@
 import { useState } from 'react'
-import {
-  asset,
-  getClientId,
-  getMapsKey,
-  isClientIdFromEnv,
-  isMapsKeyFromEnv,
-  setClientId,
-  setMapsKey,
-} from '../config'
-import { signIn } from '../google/auth'
+import { asset } from '../config'
+import { supabase } from '../supabase/client'
 
-interface Props {
-  onSignedIn: () => void
-}
-
-export default function SignIn({ onSignedIn }: Props) {
-  const [clientId, setId] = useState(getClientId())
-  const [mapsKey, setKey] = useState(getMapsKey())
-  // Credentials baked into the build take over; users never configure anything.
-  const managed = isClientIdFromEnv()
-  const [needsSetup, setNeedsSetup] = useState(!managed && !getClientId())
+export default function SignIn() {
+  const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
 
-  async function doSignIn() {
+  async function signInWithGoogle() {
     setBusy(true)
     setError('')
     try {
-      if (needsSetup) {
-        if (!clientId.trim()) throw new Error('Enter your Google OAuth Client ID.')
-        setClientId(clientId)
-        setMapsKey(mapsKey)
-      }
-      await signIn()
-      onSignedIn()
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href },
+      })
+      if (error) throw error
+      // Browser redirects to Google; auth state resolves on return.
     } catch (e) {
       setError((e as Error).message)
+      setBusy(false)
+    }
+  }
+
+  async function sendMagicLink() {
+    const value = email.trim()
+    if (!value) return setError('Enter your email address.')
+    setBusy(true)
+    setError('')
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: value,
+        options: { emailRedirectTo: window.location.href },
+      })
+      if (error) throw error
+      setSent(true)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
       setBusy(false)
     }
   }
@@ -51,50 +54,45 @@ export default function SignIn({ onSignedIn }: Props) {
       <h1 className="text-2xl font-bold">GrandEase Traveler</h1>
       <p className="text-white/50 mt-1 mb-8">Where will you go?</p>
 
-      {needsSetup && (
-        <div className="w-full max-w-sm text-left mb-4">
-          <label className="label">Google OAuth Client ID</label>
-          <input
-            className="field"
-            placeholder="xxxx.apps.googleusercontent.com"
-            value={clientId}
-            onChange={(e) => setId(e.target.value)}
-          />
-          <p className="text-white/40 text-xs mt-2">
-            One-time setup. Create an OAuth Client ID in Google Cloud Console (see the README),
-            then paste it here. Stored only in this browser.
-          </p>
-
-          {!isMapsKeyFromEnv() && (
-            <>
-              <label className="label mt-4">Google Maps API key</label>
-              <input
-                className="field"
-                placeholder="AIza… (for automatic time zones)"
-                value={mapsKey}
-                onChange={(e) => setKey(e.target.value)}
-              />
-              <p className="text-white/40 text-xs mt-2">
-                Recommended. Enables accurate address geocoding so each item’s time zone is set
-                automatically. Without it, a keyless fallback is used.
-              </p>
-            </>
-          )}
-        </div>
-      )}
-
-      <button className="btn-primary w-full max-w-sm" onClick={doSignIn} disabled={busy}>
-        {busy ? 'Connecting…' : 'Sign in with Google'}
-      </button>
-
-      {!needsSetup && !managed && (
-        <button
-          className="text-white/40 text-xs mt-3 hover:text-white/70"
-          onClick={() => setNeedsSetup(true)}
-        >
-          Change Client ID
+      <div className="w-full max-w-sm space-y-4">
+        <button className="btn-primary w-full" onClick={signInWithGoogle} disabled={busy}>
+          {busy ? 'Connecting…' : 'Sign in with Google'}
         </button>
-      )}
+
+        <div className="flex items-center gap-3 text-white/30 text-xs">
+          <div className="flex-1 border-t border-white/10" />
+          or
+          <div className="flex-1 border-t border-white/10" />
+        </div>
+
+        {sent ? (
+          <p className="text-white/70 text-sm">
+            Check your inbox — we sent a magic sign-in link to{' '}
+            <span className="text-white">{email.trim()}</span>. Open it on this device to
+            finish signing in.
+          </p>
+        ) : (
+          <div className="text-left space-y-2">
+            <label className="label">Email</label>
+            <input
+              className="field"
+              type="email"
+              autoComplete="email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMagicLink()}
+            />
+            <button
+              className="btn-ghost w-full"
+              onClick={sendMagicLink}
+              disabled={busy}
+            >
+              {busy ? 'Sending…' : 'Email me a magic link'}
+            </button>
+          </div>
+        )}
+      </div>
 
       {error && <p className="text-red-400 text-sm mt-4 max-w-sm">{error}</p>}
     </div>
