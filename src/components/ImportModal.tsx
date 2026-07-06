@@ -1,44 +1,92 @@
 import { useState } from 'react'
-import { Check, Copy } from 'lucide-react'
-import type { ItineraryItem } from '../types'
+import { FunctionsHttpError } from '@supabase/supabase-js'
+import type { ItineraryItem, Trip } from '../types'
 import * as store from '../store/store'
+import { supabase } from '../supabase/client'
 import { hasLocation, timezoneForItem } from '../lib/geo'
 import { parseItems } from '../lib/schema'
-import { SCHEMA_PROMPT } from '../lib/schema'
-import { TYPE_LABEL, weekdayLong } from '../lib/format'
+import { defaultTimezone, TYPE_LABEL, weekdayLong } from '../lib/format'
 import Modal from './Modal'
 
 interface Props {
   calendarId: string
+  trip?: Trip
+  day?: string
   onClose: () => void
   onImported: (items: ItineraryItem[]) => void
 }
 
-export default function ImportModal({ calendarId, onClose, onImported }: Props) {
+// Pull the structured { errors } body out of a non-2xx edge-function response.
+// Guarded because the body may not be JSON (e.g. a gateway/timeout error).
+async function readFunctionError(error: FunctionsHttpError): Promise<string> {
+  try {
+    const body = await error.context.json()
+    const errors = (body as { errors?: string[]; error?: string; message?: string })
+    if (Array.isArray(errors.errors) && errors.errors.length) return errors.errors.join(' ')
+    if (errors.error) return errors.error
+    if (errors.message) return errors.message
+  } catch {
+    /* not JSON — fall through to the generic message */
+  }
+  return error.message
+}
+
+export default function ImportModal({ calendarId, trip, day, onClose, onImported }: Props) {
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<ItineraryItem[]>([])
   const [errors, setErrors] = useState<string[]>([])
-  const [copied, setCopied] = useState(false)
+  const [extracting, setExtracting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
-  function preview(t: string) {
-    setText(t)
+  async function extract() {
+    const value = text.trim()
+    if (!value) return
+    setExtracting(true)
     setSaveError('')
-    if (!t.trim()) {
-      setParsed([])
-      setErrors([])
-      return
+    setParsed([])
+    setErrors([])
+    try {
+      const { data, error } = await supabase.functions.invoke('text-to-events', {
+        body: {
+          text: value,
+          context: {
+            tripStart: trip?.startDate,
+            tripEnd: trip?.endDate,
+            currentDate: day || new Date().toISOString().slice(0, 10),
+            defaultTimezone: trip?.timezone || defaultTimezone,
+          },
+        },
+      })
+      if (error) {
+        // For non-2xx, invoke() returns a FunctionsHttpError BEFORE the
+        // structured { errors } body is read — so read it off the response to
+        // surface "Daily AI limit reached" / "Unauthorized" etc.
+        if (error instanceof FunctionsHttpError) {
+          setSaveError(await readFunctionError(error))
+        } else {
+          setSaveError((error as Error).message)
+        }
+        return
+      }
+      const result = data as { items?: unknown[]; errors?: string[] }
+      // A 2xx response can still carry structured errors.
+      if (result.errors && result.errors.length > 0 && !(result.items && result.items.length)) {
+        setErrors(result.errors)
+        return
+      }
+      // Run the model output through the local validator as a safety net.
+      const { items, errors: parseErrors } = parseItems(JSON.stringify(result.items ?? []))
+      setParsed(items)
+      setErrors([...(result.errors ?? []), ...parseErrors])
+      if (items.length === 0 && (result.errors ?? []).length === 0 && parseErrors.length === 0) {
+        setErrors(['No itinerary items were found in that text.'])
+      }
+    } catch (e) {
+      setSaveError((e as Error).message)
+    } finally {
+      setExtracting(false)
     }
-    const { items, errors } = parseItems(t)
-    setParsed(items)
-    setErrors(errors)
-  }
-
-  async function copyPrompt() {
-    await navigator.clipboard.writeText(SCHEMA_PROMPT)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
   }
 
   async function importAll() {
@@ -47,7 +95,7 @@ export default function ImportModal({ calendarId, onClose, onImported }: Props) 
     try {
       const saved: ItineraryItem[] = []
       for (const it of parsed) {
-        // Auto-detect the timezone from the location when the LLM didn't supply one.
+        // Auto-detect the timezone from the location when the model didn't supply one.
         let tz = it.timezone
         if (!tz && hasLocation(it)) tz = (await timezoneForItem(it)) || undefined
         saved.push(store.addItem(calendarId, { ...it, timezone: tz }))
@@ -82,30 +130,27 @@ export default function ImportModal({ calendarId, onClose, onImported }: Props) 
         <div className="bg-white/5 rounded-xl p-3 text-sm text-white/70 space-y-2">
           <p className="font-medium text-white">How it works</p>
           <ol className="list-decimal list-inside space-y-1 text-white/60">
-            <li>Copy the schema prompt below.</li>
-            <li>
-              Paste it into any AI chat (ChatGPT, Claude, Gemini) followed by your reservation
-              email or dictation.
-            </li>
-            <li>Paste the JSON it returns into the box, review, and add.</li>
+            <li>Paste a reservation email, or dictate your plans, into the box below.</li>
+            <li>Tap Extract — AI turns it into itinerary items.</li>
+            <li>Review the preview and add them to your trip.</li>
           </ol>
-          <button
-            onClick={copyPrompt}
-            className="btn-ghost inline-flex items-center gap-1 !px-2 !py-1"
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? 'Copied!' : 'Copy schema prompt'}
-          </button>
         </div>
 
         <div>
-          <label className="label">Paste JSON</label>
+          <label className="label">Reservation email or notes</label>
           <textarea
-            className="field min-h-[120px] font-mono text-xs"
-            placeholder='[ { "type": "travel", "title": "United", ... } ]'
+            className="field min-h-[140px] text-sm"
+            placeholder="Paste your confirmation email or type your plans…"
             value={text}
-            onChange={(e) => preview(e.target.value)}
+            onChange={(e) => setText(e.target.value)}
           />
+          <button
+            className="btn-primary w-full mt-2"
+            onClick={extract}
+            disabled={extracting || !text.trim()}
+          >
+            {extracting ? 'Extracting…' : 'Extract'}
+          </button>
         </div>
 
         {errors.length > 0 && (

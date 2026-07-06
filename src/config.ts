@@ -1,38 +1,12 @@
 // App configuration.
-//
-// The Google OAuth *Client ID* is public (no secret). It can be supplied at
-// build time via VITE_GOOGLE_CLIENT_ID, or entered at runtime and stored in
-// localStorage so the hosted GitHub Pages build works without a rebuild.
-
-const LS_CLIENT_ID = 'grandease.googleClientId'
-
-export const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/calendar'
 
 // Resolve a /public asset path correctly on GitHub Pages subpaths.
 export const asset = (name: string) => `${import.meta.env.BASE_URL}${name}`
 
-// Marker written into every trip calendar's description.
-export const APP_MARKER = 'GrandEase Traveler'
-export const META_VERSION = 2
-
-/** True when a Client ID is baked into the build (VITE_GOOGLE_CLIENT_ID). */
-export function isClientIdFromEnv(): boolean {
-  const v = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
-  return !!(v && v.trim())
-}
-
-export function getClientId(): string {
-  const fromEnv = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
-  if (fromEnv && fromEnv.trim()) return fromEnv.trim()
-  return localStorage.getItem(LS_CLIENT_ID)?.trim() || ''
-}
-
-export function setClientId(id: string) {
-  localStorage.setItem(LS_CLIENT_ID, id.trim())
-}
-
-// Google Maps Platform API key (separate from the OAuth Client ID). Used client-side
-// via the Maps JavaScript API for accurate geocoding -> automatic time zones.
+// Google Maps Platform API key. Used client-side via the Maps JavaScript API
+// for accurate geocoding -> automatic time zones. Optional: baked in at build
+// time via VITE_GOOGLE_MAPS_API_KEY, or entered at runtime (stored in this
+// browser). Without it, a keyless Nominatim fallback is used.
 const LS_MAPS_KEY = 'grandease.googleMapsKey'
 /** True when a Maps key is baked into the build (VITE_GOOGLE_MAPS_API_KEY). */
 export function isMapsKeyFromEnv(): boolean {

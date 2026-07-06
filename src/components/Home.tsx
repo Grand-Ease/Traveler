@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { LogOut, Pencil, Plus, Settings, Share2, Trash2 } from 'lucide-react'
 import type { Trip } from '../types'
-import { signOut } from '../google/auth'
+import { supabase } from '../supabase/client'
 import { asset } from '../config'
 import { shortRange } from '../lib/format'
 import * as store from '../store/store'
@@ -61,7 +61,7 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
         </button>
         <button
           onClick={() => {
-            signOut()
+            void supabase.auth.signOut()
             onSignOut()
           }}
           className="text-white/50 hover:text-white p-2"
