@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, MapPin, Pencil, Phone, Trash2 } from 'lucide-react'
+import { ChevronDown, MapPin, Pencil, Phone, PlaneLanding, PlaneTakeoff, Trash2 } from 'lucide-react'
 import type { ItineraryItem } from '../types'
 import { formatTime, parseDateOnly } from '../lib/format'
 import { deviceTimezone, tzAbbrev } from '../lib/timezones'
@@ -10,11 +10,14 @@ interface Props {
   canEdit: boolean
   onEdit: () => void
   onDelete: () => void
+  /** When set, render just one leg of a travel item (mirrors the map). */
+  leg?: 'departure' | 'arrival'
 }
 
-export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
+export default function ItemCard({ item, canEdit, onEdit, onDelete, leg }: Props) {
   const [open, setOpen] = useState(false)
   const Ico = iconFor(item)
+  const isDep = leg === 'departure'
 
   // For travel that lands on a later date, tag the arrival time with its date.
   const arrivalCrossesDay =
@@ -33,21 +36,30 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
       ? `${item.nights || 1} night${(item.nights || 1) > 1 ? 's' : ''}`
       : [formatTime(item.startTime), endTimeText].filter(Boolean).join(' – ')
 
+  // For a single leg, show only that side's time; otherwise the full range.
+  const displayedTimeText = leg ? (isDep ? formatTime(item.startTime) : endTimeText) : timeText
+
   // Show the destination zone whenever it differs from where the viewer is,
   // so a Paris 7pm event reads clearly even when viewed from New York.
+  const relevantTimePresent = leg
+    ? isDep
+      ? !!item.startTime
+      : !!item.endTime
+    : !!item.startTime && item.type !== 'lodging'
   const showTz =
-    !!item.startTime &&
-    item.type !== 'lodging' &&
-    !!item.timezone &&
-    item.timezone !== deviceTimezone
+    relevantTimePresent && !!item.timezone && item.timezone !== deviceTimezone
   const tzText = showTz ? tzAbbrev(item.timezone!) : ''
 
-  const mapsUrl = item.location
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.location)}`
+  // Location shown/linked: the relevant endpoint for a leg, else the item's.
+  const displayLocation = leg ? (isDep ? item.from : item.to) : item.location
+  const mapsUrl = displayLocation
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(displayLocation)}`
     : undefined
 
+  // Gate/platform only applies to the departure leg.
+  const showGate = !!item.gate && item.type === 'travel' && (!leg || isDep)
   const hasDetails =
-    item.confirmation || item.phone || item.notes || item.seatsOrRoom || item.gate
+    item.confirmation || item.phone || item.notes || item.seatsOrRoom || showGate
 
   return (
     <div className="card">
@@ -86,33 +98,39 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete }: Props) {
             </div>
           </div>
 
-          {item.type === 'travel' && (item.from || item.to) && (
-            <p className="text-white/60 text-sm">
-              {item.from || '?'} → {item.to || '?'}
+          {leg ? (
+            <p className="text-teal/80 text-xs font-medium inline-flex items-center gap-1">
+              {isDep ? <PlaneTakeoff size={12} /> : <PlaneLanding size={12} />}
+              {isDep ? 'Departure' : 'Arrival'}
             </p>
+          ) : (
+            item.type === 'travel' &&
+            (item.from || item.to) && (
+              <p className="text-white/60 text-sm">
+                {item.from || '?'} → {item.to || '?'}
+              </p>
+            )
           )}
-          {timeText && (
+          {displayedTimeText && (
             <p className="text-white/60 text-sm">
-              {timeText}
+              {displayedTimeText}
               {tzText && <span className="text-teal/80"> · {tzText}</span>}
             </p>
           )}
-          {item.location && (
+          {displayLocation && (
             <a
               href={mapsUrl}
               target="_blank"
               rel="noreferrer"
               className="text-white/50 text-sm inline-flex items-center gap-1 hover:text-teal"
             >
-              <MapPin size={13} /> {item.location}
+              <MapPin size={13} /> {displayLocation}
             </a>
           )}
 
           {open && hasDetails && (
             <div className="mt-3 space-y-1 text-sm border-t border-white/10 pt-3">
-              {item.type === 'travel' && item.gate && (
-                <Detail label="Gate / Platform" value={item.gate} />
-              )}
+              {showGate && <Detail label="Gate / Platform" value={item.gate!} />}
               {item.seatsOrRoom && (
                 <Detail
                   label={item.type === 'lodging' ? 'Room' : 'Seats'}
