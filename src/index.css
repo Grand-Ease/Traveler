@@ -78,7 +78,8 @@ button {
     @apply text-teal font-semibold px-3 py-2 rounded-lg hover:bg-white/5 transition;
   }
   .field {
-    @apply w-full min-w-0 bg-white/10 text-white rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-teal placeholder-white/30;
+    @apply block w-full max-w-full min-w-0 bg-white/10 text-white rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-teal placeholder-white/30;
+    box-sizing: border-box;
   }
   .label {
     @apply text-sm font-semibold text-white/90 mb-1 block;
@@ -86,4 +87,20 @@ button {
   .card {
     @apply bg-cardHi rounded-2xl p-4;
   }
+}
+
+/* Safari gives native date/time controls an intrinsic width that can exceed a
+   two-column form cell. Constrain both the control and its internal editor so
+   paired fields keep their gap instead of painting over one another. */
+input.field[type='date'],
+input.field[type='time'] {
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+input.field[type='date']::-webkit-datetime-edit,
+input.field[type='time']::-webkit-datetime-edit {
+  min-width: 0;
+  overflow: hidden;
 }

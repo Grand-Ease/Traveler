@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapPin } from 'lucide-react'
+import { MapPin, Trash2 } from 'lucide-react'
 import {
   ACTIVITY_SUBTYPES,
   TRAVEL_SUBTYPES,
@@ -108,6 +108,12 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
     }
   }
 
+  function remove() {
+    if (!item.id || !confirm(`Delete “${item.title}”?`)) return
+    store.deleteItem(calendarId, item.id)
+    onClose()
+  }
+
   const titleLabel =
     item.type === 'travel'
       ? 'Carrier'
@@ -125,6 +131,16 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
       onClose={onClose}
       footer={
         <>
+          {!isNew && (
+            <button
+              className="btn-ghost inline-flex items-center gap-1.5 text-red-400"
+              onClick={remove}
+              disabled={saving}
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
+          )}
           <button className="btn-ghost" onClick={onClose} disabled={saving}>
             Cancel
           </button>
@@ -180,7 +196,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
         <Text label={titleLabel} value={item.title} onChange={(v) => set('title', v)} />
 
         {item.type === 'travel' && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
             <Text label="Flight / train #" value={item.number} onChange={(v) => set('number', v)} />
             <Text label="Gate / Platform" value={item.gate} onChange={(v) => set('gate', v)} />
             <LocationInput
@@ -202,7 +218,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
 
         {item.type === 'travel' ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
               <Field label="Departure date">
                 <input
                   type="date"
@@ -230,7 +246,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
               <Field label="Arrival date">
                 <input
                   type="date"
@@ -255,7 +271,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
             <Text label="Seats" value={item.seatsOrRoom} onChange={(v) => set('seatsOrRoom', v)} />
           </div>
         ) : item.type === 'lodging' ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
             <Field label="Check-in date">
               <input
                 type="date"
@@ -275,7 +291,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
             </Field>
           </div>
         ) : item.type === 'note' ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
             <Field label="Date">
               <input
                 type="date"
@@ -304,7 +320,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
                 onChange={(e) => set('date', e.target.value)}
               />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
               <Field label="Start">
                 <input
                   type="time"
@@ -373,7 +389,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
         )}
 
         {item.type !== 'note' && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
             <Text
               label={item.type === 'lodging' ? 'Room #' : 'Confirmation #'}
               value={item.type === 'lodging' ? item.seatsOrRoom : item.confirmation}
