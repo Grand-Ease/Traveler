@@ -193,18 +193,6 @@ export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
             </div>
           )
         })}
-        {canEdit && places.length < 3 && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              beginEdit(true)
-            }}
-            className="shrink-0 w-7 h-7 rounded-full border border-white/15 text-teal hover:bg-white/5 flex items-center justify-center"
-            title="Add another place"
-          >
-            <Plus size={16} />
-          </button>
-        )}
       </div>
     </div>
   )

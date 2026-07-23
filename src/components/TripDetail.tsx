@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import type { DayPlace, ItineraryItem, Trip } from '../types'
 import { addDays, eachDay, weekdayLong } from '../lib/format'
-import { setDayPlaces } from '../lib/locations'
+import { activePlaceIndex, placesForDay, refTimeForDay, setDayPlaces } from '../lib/locations'
 import * as store from '../store/store'
 import { useItems, useTrip } from '../store/hooks'
 import { TYPE_ICONS } from './icons'
@@ -22,6 +22,7 @@ import ItemCard from './ItemCard'
 import ItemForm from './ItemForm'
 import ImportModal from './ImportModal'
 import DayLocations from './DayLocations'
+import DayWeather from './DayWeather'
 import SyncBadge from './SyncBadge'
 
 interface Props {
@@ -111,6 +112,10 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
 
   const day = days.includes(selectedDay) ? selectedDay : days[0]
   const dayIndex = Math.max(0, days.indexOf(day))
+
+  // The day's active destination (used for the header weather lookup).
+  const dayPlaces = placesForDay(trip, day).places
+  const activePlaceName = dayPlaces[activePlaceIndex(dayPlaces, refTimeForDay(day))]?.name
 
   // The whole day's items (the map uses these; it applies `cats` itself).
   const allDayItems = useMemo(
@@ -220,6 +225,7 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
                   {trip.name} · Day {dayIndex + 1} of {days.length} · {totalDay} item
                   {totalDay === 1 ? '' : 's'}
                 </p>
+                <DayWeather place={activePlaceName} date={day} />
               </div>
               <button
                 onClick={goNext}
