@@ -375,7 +375,16 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
           trip={trip}
           day={day}
           onClose={() => setImporting(false)}
-          onImported={() => setImporting(false)}
+          onImported={(saved) => {
+            setImporting(false)
+            // Jump to the earliest imported day so the new items are visible
+            // (they usually span multiple days beyond the current selection).
+            const first = saved
+              .map((s) => s.date)
+              .filter(Boolean)
+              .sort()[0]
+            if (first) setSelectedDay(first)
+          }}
         />
       )}
     </div>

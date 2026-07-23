@@ -95,9 +95,17 @@ export default function ImportModal({ calendarId, trip, day, onClose, onImported
     try {
       const saved: ItineraryItem[] = []
       for (const it of parsed) {
-        // Auto-detect the timezone from the location when the model didn't supply one.
+        // Auto-detect the timezone from the location when the model didn't
+        // supply one. A single geocode failure must never abort the whole
+        // batch, so it's isolated in its own try/catch.
         let tz = it.timezone
-        if (!tz && hasLocation(it)) tz = (await timezoneForItem(it)) || undefined
+        if (!tz && hasLocation(it)) {
+          try {
+            tz = (await timezoneForItem(it)) || undefined
+          } catch {
+            tz = undefined
+          }
+        }
         saved.push(store.addItem(calendarId, { ...it, timezone: tz }))
       }
       onImported(saved)
