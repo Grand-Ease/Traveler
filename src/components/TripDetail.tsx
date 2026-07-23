@@ -3,7 +3,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Home as HomeIcon,
-  LayoutGrid,
   List as ListIcon,
   Map as MapIcon,
   PlaneLanding,
@@ -12,8 +11,8 @@ import {
   Sparkles,
   type LucideIcon,
 } from 'lucide-react'
-import type { DayPlace, ItineraryItem, ItemType, Trip } from '../types'
-import { addDays, eachDay, TYPE_LABEL, weekdayLong } from '../lib/format'
+import type { DayPlace, ItineraryItem, Trip } from '../types'
+import { addDays, eachDay, weekdayLong } from '../lib/format'
 import { setDayPlaces } from '../lib/locations'
 import * as store from '../store/store'
 import { useItems, useTrip } from '../store/hooks'
@@ -30,12 +29,10 @@ interface Props {
   onBack: () => void
 }
 
-type Filter = 'all' | ItemType
-const FILTERS: Filter[] = ['all', 'travel', 'lodging', 'dining', 'activity', 'note']
-
-// Map-mode multi-toggle categories (travel is split into departure/arrival).
-const MAP_CATS: MapCat[] = ['departure', 'arrival', 'lodging', 'dining', 'activity', 'note']
-const MAP_CAT_ICON: Record<MapCat, LucideIcon> = {
+// Shared multi-select categories for BOTH list and map. Travel is split into
+// departure/arrival; the rest map 1:1 to item types.
+const CATS: MapCat[] = ['departure', 'arrival', 'lodging', 'dining', 'activity', 'note']
+const CAT_ICON: Record<MapCat, LucideIcon> = {
   departure: PlaneTakeoff,
   arrival: PlaneLanding,
   lodging: TYPE_ICONS.lodging,
@@ -43,7 +40,7 @@ const MAP_CAT_ICON: Record<MapCat, LucideIcon> = {
   activity: TYPE_ICONS.activity,
   note: TYPE_ICONS.note,
 }
-const MAP_CAT_LABEL: Record<MapCat, string> = {
+const CAT_LABEL: Record<MapCat, string> = {
   departure: 'Departure',
   arrival: 'Arrival',
   lodging: 'Lodging',
@@ -52,12 +49,19 @@ const MAP_CAT_LABEL: Record<MapCat, string> = {
   note: 'Note',
 }
 
+type Leg = 'departure' | 'arrival'
+interface ListEntry {
+  key: string
+  item: ItineraryItem
+  leg?: Leg
+  time?: string
+}
+
 export default function TripDetail({ trip: tripProp, onBack }: Props) {
   const trip = useTrip(tripProp)
   const items = useItems(trip.id)
-  const [filter, setFilter] = useState<Filter>('all')
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
-  const [mapCats, setMapCats] = useState<Record<MapCat, boolean>>({
+  const [cats, setCats] = useState<Record<MapCat, boolean>>({
     departure: true,
     arrival: true,
     lodging: true,
@@ -107,16 +111,38 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
 
   const day = days.includes(selectedDay) ? selectedDay : days[0]
   const dayIndex = Math.max(0, days.indexOf(day))
-  const dayItems = itemsOnDay(day)
-    .filter((it) => filter === 'all' || it.type === filter)
-    .sort((a, b) => (a.startTime || '99').localeCompare(b.startTime || '99'))
 
-  // The whole day's items (map uses these, independent of the list filter).
+  // The whole day's items (the map uses these; it applies `cats` itself).
   const allDayItems = useMemo(
     () => itemsOnDay(day),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items, day],
   )
+
+  // List entries mirror the map: a travel item is split into a departure leg
+  // (on its departure day) and an arrival leg (on its arrival day); everything
+  // else is a single entry. The category chips toggle each leg/type on and off.
+  const listEntries = useMemo<ListEntry[]>(() => {
+    const out: ListEntry[] = []
+    for (const it of items) {
+      if (it.type === 'travel') {
+        if (cats.departure && it.date === day)
+          out.push({ key: `${it.id}-dep`, item: it, leg: 'departure', time: it.startTime })
+        const arrDate = it.endDate || it.date
+        if (cats.arrival && arrDate === day)
+          out.push({ key: `${it.id}-arr`, item: it, leg: 'arrival', time: it.endTime })
+      } else if (it.type === 'lodging') {
+        if (!cats.lodging) continue
+        const nights = Math.max(1, it.nights || 1)
+        if (day >= it.date && day < addDays(it.date, nights))
+          out.push({ key: it.id || `${it.date}-${it.title}`, item: it, time: it.startTime })
+      } else if (cats[it.type as MapCat] && it.date === day) {
+        out.push({ key: it.id || `${it.date}-${it.title}`, item: it, time: it.startTime })
+      }
+    }
+    out.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'))
+    return out
+  }, [items, day, cats])
 
   function removeItem(it: ItineraryItem) {
     if (!it.id) return
@@ -151,15 +177,14 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
   }
 
   function startAdd() {
-    const type: ItemType = filter === 'all' ? 'activity' : filter
-    // Default new items to noon; give types with an end field a +1h default.
-    const hasEnd = type !== 'note' && type !== 'lodging'
+    // New items default to an activity at noon with a +1h end; the type can be
+    // changed in the form.
     setEditing({
-      type,
+      type: 'activity',
       title: '',
       date: day,
       startTime: '12:00',
-      ...(hasEnd ? { endTime: '13:00' } : {}),
+      endTime: '13:00',
     })
   }
 
@@ -207,84 +232,74 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
           </div>
         </div>
 
-        {/* View toggle + category filter (icon-only) */}
-        <div className="flex gap-2 px-4 py-3">
-          {/* Leftmost chip: List <-> Map view toggle */}
-          {(() => {
-            const isMap = viewMode === 'map'
-            const Ico = isMap ? ListIcon : MapIcon
-            const label = isMap ? 'Show list' : 'Show map'
+        {/* Mode toggle (segmented) + shared category filters */}
+        <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto">
+          {/* Leftmost: a segmented List | Map switch. Its pill shape and paired
+              icons read as a mode toggle, distinct from the round filter chips. */}
+          <div className="shrink-0 inline-flex items-center h-10 rounded-full border border-white/15 overflow-hidden">
+            {(['list', 'map'] as const).map((m) => {
+              const active = viewMode === m
+              const Ico = m === 'list' ? ListIcon : MapIcon
+              const label = m === 'list' ? 'List view' : 'Map view'
+              return (
+                <button
+                  key={m}
+                  onClick={() => setViewMode(m)}
+                  aria-label={label}
+                  title={label}
+                  aria-pressed={active}
+                  className={`inline-flex items-center justify-center w-10 h-10 ${
+                    active ? 'bg-teal text-white' : 'text-white/50 hover:bg-white/5'
+                  }`}
+                >
+                  <Ico size={18} />
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="w-px h-6 bg-white/10 shrink-0" />
+
+          {/* Shared filters: multi-select in both list and map modes. */}
+          {CATS.map((c) => {
+            const active = cats[c]
+            const Ico = CAT_ICON[c]
+            const label = CAT_LABEL[c]
             return (
               <button
-                onClick={() => setViewMode(isMap ? 'list' : 'map')}
+                key={c}
+                onClick={() => setCats((m) => ({ ...m, [c]: !m[c] }))}
                 aria-label={label}
                 title={label}
+                aria-pressed={active}
                 className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border ${
-                  isMap
+                  active
                     ? 'bg-teal text-white border-teal'
-                    : 'border-white/15 text-white/60 hover:bg-white/5'
+                    : 'border-white/15 text-white/40 hover:bg-white/5'
                 }`}
               >
                 <Ico size={18} />
               </button>
             )
-          })()}
-
-          {viewMode === 'list'
-            ? FILTERS.map((f) => {
-                const active = filter === f
-                const Ico = f === 'all' ? LayoutGrid : TYPE_ICONS[f]
-                const label = f === 'all' ? 'All' : TYPE_LABEL[f]
-                return (
-                  <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    aria-label={label}
-                    title={label}
-                    className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border ${
-                      active
-                        ? 'bg-teal text-white border-teal'
-                        : 'border-white/15 text-white/60 hover:bg-white/5'
-                    }`}
-                  >
-                    <Ico size={18} />
-                  </button>
-                )
-              })
-            : MAP_CATS.map((c) => {
-                const active = mapCats[c]
-                const Ico = MAP_CAT_ICON[c]
-                const label = MAP_CAT_LABEL[c]
-                return (
-                  <button
-                    key={c}
-                    onClick={() => setMapCats((m) => ({ ...m, [c]: !m[c] }))}
-                    aria-label={label}
-                    title={label}
-                    className={`shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border ${
-                      active
-                        ? 'bg-teal text-white border-teal'
-                        : 'border-white/15 text-white/40 hover:bg-white/5'
-                    }`}
-                  >
-                    <Ico size={18} />
-                  </button>
-                )
-              })}
+          })}
         </div>
       </div>
 
       {viewMode === 'map' ? (
         /* Map fills the middle region and manages its own gestures. */
         <div className="flex-1 min-h-0">
-          <DayMap items={allDayItems} cats={mapCats} />
+          <DayMap items={allDayItems} cats={cats} />
         </div>
       ) : (
         /* Items (only this region scrolls vertically) */
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-          {dayItems.length === 0 && (
+          {listEntries.length === 0 && (
             <div className="text-center py-16 text-white/40">
-              <p>Nothing planned{filter === 'all' ? '' : ` for ${TYPE_LABEL[filter as ItemType]}`} on this day.</p>
+              <p>
+                {allDayItems.length
+                  ? 'No items match the selected filters.'
+                  : 'Nothing planned for this day.'}
+              </p>
               {canEdit && (
                 <button className="btn-primary mt-4" onClick={startAdd}>
                   Add something
@@ -292,13 +307,14 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
               )}
             </div>
           )}
-          {dayItems.map((it) => (
+          {listEntries.map((entry) => (
             <ItemCard
-              key={it.id}
-              item={it}
+              key={entry.key}
+              item={entry.item}
+              leg={entry.leg}
               canEdit={canEdit}
-              onEdit={() => setEditing(it)}
-              onDelete={() => removeItem(it)}
+              onEdit={() => setEditing(entry.item)}
+              onDelete={() => removeItem(entry.item)}
             />
           ))}
         </div>
