@@ -202,7 +202,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
 
         {item.type === 'travel' ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Field label="Departure date">
                 <input
                   type="date"
@@ -230,7 +230,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Field label="Arrival date">
                 <input
                   type="date"
@@ -254,9 +254,9 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
             </div>
             <Text label="Seats" value={item.seatsOrRoom} onChange={(v) => set('seatsOrRoom', v)} />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label={item.type === 'lodging' ? 'Check-in date' : 'Date'}>
+        ) : item.type === 'lodging' ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Check-in date">
               <input
                 type="date"
                 className="field"
@@ -264,51 +264,77 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
                 onChange={(e) => set('date', e.target.value)}
               />
             </Field>
-            {item.type === 'lodging' ? (
-              <Field label="Nights">
+            <Field label="Nights">
+              <input
+                type="number"
+                min={1}
+                className="field"
+                value={item.nights ?? 1}
+                onChange={(e) => set('nights', Number(e.target.value))}
+              />
+            </Field>
+          </div>
+        ) : item.type === 'note' ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Date">
+              <input
+                type="date"
+                className="field"
+                value={item.date}
+                onChange={(e) => set('date', e.target.value)}
+              />
+            </Field>
+            <Field label="Time">
+              <input
+                type="time"
+                className="field"
+                value={item.startTime || ''}
+                onChange={(e) => set('startTime', e.target.value)}
+              />
+            </Field>
+          </div>
+        ) : (
+          // dining & activity: date on its own row, start/end paired below
+          <div className="space-y-3">
+            <Field label="Date">
+              <input
+                type="date"
+                className="field"
+                value={item.date}
+                onChange={(e) => set('date', e.target.value)}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Start">
                 <input
-                  type="number"
-                  min={1}
+                  type="time"
                   className="field"
-                  value={item.nights ?? 1}
-                  onChange={(e) => set('nights', Number(e.target.value))}
+                  value={item.startTime || ''}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    // Auto-follow End at +1h until the user edits End themselves
+                    // (an empty End still counts as untouched).
+                    const follow = v && (!endTouched || !item.endTime)
+                    setItem((p) => ({
+                      ...p,
+                      startTime: v,
+                      ...(follow ? { endTime: addOneHour(v) } : {}),
+                    }))
+                  }}
                 />
               </Field>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Start">
-                  <input
-                    type="time"
-                    className="field"
-                    value={item.startTime || ''}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      // Auto-follow End at +1h until the user edits End themselves
-                      // (an empty End still counts as untouched).
-                      const follow = v && (!endTouched || !item.endTime)
-                      setItem((p) => ({
-                        ...p,
-                        startTime: v,
-                        ...(follow ? { endTime: addOneHour(v) } : {}),
-                      }))
-                    }}
-                  />
-                </Field>
-                {item.type !== 'note' && (
-                  <Field label="End">
-                    <input
-                      type="time"
-                      className="field"
-                      value={item.endTime || ''}
-                      onChange={(e) => {
-                        setEndTouched(true)
-                        set('endTime', e.target.value)
-                      }}
-                    />
-                  </Field>
-                )}
-              </div>
-            )}
+              <Field label="End">
+                <input
+                  type="time"
+                  className="field"
+                  value={item.endTime || ''}
+                  onChange={(e) => {
+                    setEndTouched(true)
+                    set('endTime', e.target.value)
+                  }}
+                />
+              </Field>
+            </div>
           </div>
         )}
 
@@ -433,7 +459,7 @@ function SubtypeRow({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="label">{label}</label>
       {children}
     </div>

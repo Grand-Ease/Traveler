@@ -56,7 +56,7 @@ export default function AddTripModal({ edit, onClose, onSaved }: Props) {
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div>
+          <div className="min-w-0">
             <label className="label">Start date</label>
             <input
               type="date"
@@ -65,7 +65,7 @@ export default function AddTripModal({ edit, onClose, onSaved }: Props) {
               onChange={(e) => setStart(e.target.value)}
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="label">End date</label>
             <input
               type="date"
