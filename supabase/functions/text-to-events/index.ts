@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
   if (!geminiKey) {
     return json({ items: [], errors: ['Server missing GEMINI_API_KEY.'] }, 500)
   }
-  const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash'
+  const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash'
 
   // ---- call Gemini with structured output ----
   const endpoint =
