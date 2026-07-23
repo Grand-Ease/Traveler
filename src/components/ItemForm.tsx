@@ -13,6 +13,7 @@ import { dayTimezone } from '../lib/locations'
 import { deviceTimezone, tzAbbrev } from '../lib/timezones'
 import { hasLocation, timezoneForItem } from '../lib/geo'
 import { iconFor, TYPE_ICONS } from './icons'
+import LocationInput from './LocationInput'
 import Modal from './Modal'
 
 interface Props {
@@ -45,8 +46,10 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
   const [detectedTz, setDetectedTz] = useState<string | null | undefined>(
     initial.timezone,
   )
-  // Once the user edits End directly, stop auto-following the Start time.
-  const [endTouched, setEndTouched] = useState(false)
+  // Once the user edits End directly, stop auto-following the Start time. An
+  // existing item that already has an end time counts as "set" so editing its
+  // start never clobbers a saved end; new items let the end follow (+1h).
+  const [endTouched, setEndTouched] = useState(!!initial.id && !!initial.endTime)
   const isNew = !item.id
 
   const set = <K extends keyof ItineraryItem>(k: K, v: ItineraryItem[K]) =>
@@ -74,7 +77,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
     return () => window.clearTimeout(debounceRef.current)
     // Re-run when the relevant location inputs change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.location, item.from, item.to, item.type])
+  }, [item.location, item.from, item.to, item.type, item.subtype])
 
   async function save() {
     if (!item.title.trim()) {
@@ -180,14 +183,26 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
           <div className="grid grid-cols-2 gap-3">
             <Text label="Flight / train #" value={item.number} onChange={(v) => set('number', v)} />
             <Text label="Gate / Platform" value={item.gate} onChange={(v) => set('gate', v)} />
-            <Text label="From" value={item.from} onChange={(v) => set('from', v)} />
-            <Text label="To" value={item.to} onChange={(v) => set('to', v)} />
+            <LocationInput
+              label="From"
+              value={item.from}
+              mode={item.subtype || 'airplane'}
+              placeholder="Airport / station code or place"
+              onChange={(v) => set('from', v)}
+            />
+            <LocationInput
+              label="To"
+              value={item.to}
+              mode={item.subtype || 'airplane'}
+              placeholder="Airport / station code or place"
+              onChange={(v) => set('to', v)}
+            />
           </div>
         )}
 
         {item.type === 'travel' ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Departure date">
                 <input
                   type="date"
@@ -215,7 +230,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Arrival date">
                 <input
                   type="date"
@@ -240,7 +255,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
             <Text label="Seats" value={item.seatsOrRoom} onChange={(v) => set('seatsOrRoom', v)} />
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label={item.type === 'lodging' ? 'Check-in date' : 'Date'}>
               <input
                 type="date"
@@ -297,9 +312,10 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
           </div>
         )}
 
-        <Text
+        <LocationInput
           label="Location / address"
           value={item.location}
+          mode={item.type === 'travel' ? item.subtype || 'airplane' : undefined}
           onChange={(v) => set('location', v)}
           placeholder={
             item.type === 'travel'

@@ -2,6 +2,8 @@
 // browser-supported way to geocode (the REST web services block CORS).
 
 interface MapsGeocoderResult {
+  formatted_address?: string
+  types?: string[]
   geometry: { location: { lat: () => number; lng: () => number } }
 }
 interface MapsGeocoder {
