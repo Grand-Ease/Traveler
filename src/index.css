@@ -97,10 +97,23 @@ input.field[type='time'] {
   inline-size: 100%;
   min-inline-size: 0;
   max-inline-size: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  overflow: hidden;
+  line-height: 1.25rem;
 }
 
 input.field[type='date']::-webkit-datetime-edit,
 input.field[type='time']::-webkit-datetime-edit {
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
+  padding: 0;
+}
+
+input.field[type='date']::-webkit-date-and-time-value,
+input.field[type='time']::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
 }
