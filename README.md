@@ -125,8 +125,16 @@ store it in your browser — handy for quick trials.)
 
 ## 4. Sharing a trip
 
-Open a trip on the Home screen → **Share** → enter a Google email and pick "Can edit" or
-"View only". They sign in to the app (or just open Google Calendar) and the trip is there.
+Open a trip on the Home screen → **Share** → enter an email and pick **Editor** or
+**Viewer**. The owner sees each invitee with **Accepted** or **Pending** status and can
+**resend** or cancel pending invites.
+
+- If they already use the app, they get access immediately.
+- Otherwise a pending invite is stored; they get the trip after signing in with the **same
+  email** (Google or magic link).
+- Outbound invite emails are sent by the Supabase Edge Function `send-trip-invite` via
+  **Resend**. Configure secrets and deploy the function — see `supabase/README.md`.
+
 Only the trip owner can manage sharing.
 
 ---

@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { RefreshCw, Trash2 } from 'lucide-react'
 import type { Trip } from '../types'
-import { listShares, shareTrip, unshareTrip, type Share } from '../supabase/data'
+import {
+  listShares,
+  removePendingInvite,
+  shareTrip,
+  unshareTrip,
+  type Share,
+} from '../supabase/data'
 import { isOnline, isTripPending } from '../store/store'
 import Modal from './Modal'
 
@@ -52,10 +58,16 @@ export default function ShareModal({ trip, onClose }: Props) {
     try {
       const res = await shareTrip(trip.id, value, role)
       setEmail('')
-      setNotice(
+      const accessNotice =
         res.status === 'added'
-          ? `${value} was added to the trip.`
-          : `${value} isn’t signed up yet — they’ll get access automatically when they sign in.`,
+          ? `${value} already has access to the trip.`
+          : `${value} will get access when they sign in.`
+      setNotice(
+        res.emailSent
+          ? `${accessNotice} Invite email sent.`
+          : res.emailSkipped
+            ? accessNotice
+            : `${accessNotice} ${res.emailError ?? 'The invite email was not sent.'}`,
       )
       await refresh()
     } catch (e) {
@@ -65,11 +77,38 @@ export default function ShareModal({ trip, onClose }: Props) {
     }
   }
 
-  async function remove(userId: string) {
+  async function resend(share: Share) {
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await shareTrip(
+        trip.id,
+        share.email,
+        share.role as 'editor' | 'viewer',
+      )
+      setNotice(
+        res.emailSent
+          ? `Invite resent to ${share.email}.`
+          : res.emailError ?? `The invite to ${share.email} was not sent.`,
+      )
+      await refresh()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(share: Share) {
     setBusy(true)
     setError('')
     try {
-      await unshareTrip(trip.id, userId)
+      if (share.accepted && share.userId) {
+        await unshareTrip(trip.id, share.userId)
+      } else {
+        await removePendingInvite(trip.id, share.id)
+      }
       await refresh()
     } catch (e) {
       setError((e as Error).message)
@@ -99,7 +138,8 @@ export default function ShareModal({ trip, onClose }: Props) {
       ) : (
         <div className="space-y-4">
           <p className="text-white/50 text-sm">
-            Invite by email. Invitees just sign in — the trip appears automatically.
+            Invite by email. Invitees sign in with the same address and the trip appears
+            automatically.
           </p>
           <div className="flex gap-2">
             <input
@@ -130,22 +170,55 @@ export default function ShareModal({ trip, onClose }: Props) {
               <p className="label">People with access</p>
               {shares.map((s) => (
                 <div
-                  key={s.userId}
+                  key={s.id}
                   className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm">{s.email}</p>
-                    <p className="text-white/40 text-xs">{roleLabel(s.role)}</p>
+                    <p className="text-white/40 text-xs">
+                      {roleLabel(s.role)}
+                      {s.role !== 'owner' && (
+                        <>
+                          {' · '}
+                          <span className={s.accepted ? 'text-teal' : 'text-amber-300'}>
+                            {s.accepted ? 'Accepted' : 'Pending'}
+                          </span>
+                        </>
+                      )}
+                    </p>
                   </div>
-                  {s.role !== 'owner' && (
-                    <button
-                      onClick={() => remove(s.userId)}
-                      className="text-red-400 hover:opacity-80 p-1"
-                      disabled={busy}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {!s.accepted && (
+                      <button
+                        onClick={() => resend(s)}
+                        className="text-teal hover:opacity-80 p-1"
+                        disabled={busy}
+                        title={
+                          s.lastSentAt
+                            ? `Last sent ${new Date(s.lastSentAt).toLocaleString()}`
+                            : 'Send invite again'
+                        }
+                        aria-label={`Resend invite to ${s.email}`}
+                      >
+                        <RefreshCw size={16} />
+                      </button>
+                    )}
+                    {s.role !== 'owner' && (
+                      <button
+                        onClick={() => remove(s)}
+                        className="text-red-400 hover:opacity-80 p-1"
+                        disabled={busy}
+                        title={s.accepted ? 'Remove access' : 'Cancel invite'}
+                        aria-label={
+                          s.accepted
+                            ? `Remove access for ${s.email}`
+                            : `Cancel invite for ${s.email}`
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

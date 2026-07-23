@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import type { ItineraryItem, Trip } from '../types'
 import * as store from '../store/store'
+import { readFunctionError } from '../supabase/functionErrors'
 import { supabase } from '../supabase/client'
 import { hasLocation, timezoneForItem } from '../lib/geo'
 import { parseItems } from '../lib/schema'
@@ -14,21 +15,6 @@ interface Props {
   day?: string
   onClose: () => void
   onImported: (items: ItineraryItem[]) => void
-}
-
-// Pull the structured { errors } body out of a non-2xx edge-function response.
-// Guarded because the body may not be JSON (e.g. a gateway/timeout error).
-async function readFunctionError(error: FunctionsHttpError): Promise<string> {
-  try {
-    const body = await error.context.json()
-    const errors = (body as { errors?: string[]; error?: string; message?: string })
-    if (Array.isArray(errors.errors) && errors.errors.length) return errors.errors.join(' ')
-    if (errors.error) return errors.error
-    if (errors.message) return errors.message
-  } catch {
-    /* not JSON — fall through to the generic message */
-  }
-  return error.message
 }
 
 export default function ImportModal({ calendarId, trip, day, onClose, onImported }: Props) {

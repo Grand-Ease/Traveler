@@ -10,6 +10,7 @@
 // ItineraryItem shape (from/to/seatsOrRoom/endDate).
 
 import type { DayLocations, ItineraryItem, Trip } from '../types'
+import { throwFunctionInvokeError } from './functionErrors'
 import { supabase } from './client'
 
 // ---------- row shapes ----------
@@ -58,9 +59,13 @@ interface MemberTripRow {
 }
 
 interface MemberRow {
-  user_id: string
+  id: string
+  user_id: string | null
   email: string
   role: string
+  accepted: boolean
+  invited_at: string
+  last_sent_at: string | null
 }
 
 // ---------- role / access mapping ----------
@@ -273,21 +278,36 @@ export async function deleteItem(_tripId: string, id: string): Promise<void> {
 // ---------- sharing (membership model) ----------
 
 export interface Share {
-  userId: string
+  id: string
+  userId?: string
   email: string
   /** DB role: 'owner' | 'editor' | 'viewer'. */
   role: string
+  accepted: boolean
+  invitedAt: string
+  lastSentAt?: string
 }
 
 export async function listShares(tripId: string): Promise<Share[]> {
-  const { data, error } = await supabase.rpc('list_members', { p_trip: tripId })
+  const { data, error } = await supabase.rpc('list_trip_shares', { p_trip: tripId })
   if (error) throw new Error(error.message)
   const rows = (data ?? []) as unknown as MemberRow[]
-  return rows.map((m) => ({ userId: m.user_id, email: m.email, role: m.role }))
+  return rows.map((m) => ({
+    id: m.id,
+    userId: m.user_id || undefined,
+    email: m.email,
+    role: m.role,
+    accepted: m.accepted,
+    invitedAt: m.invited_at,
+    lastSentAt: m.last_sent_at ?? undefined,
+  }))
 }
 
 export interface InviteResult {
   status: 'added' | 'invited'
+  emailSent: boolean
+  emailSkipped?: boolean
+  emailError?: string
 }
 
 export async function shareTrip(
@@ -295,16 +315,23 @@ export async function shareTrip(
   email: string,
   role: 'editor' | 'viewer',
 ): Promise<InviteResult> {
-  const { data, error } = await supabase.rpc('invite_member', {
-    p_trip: tripId,
-    p_email: email,
-    p_role: role,
+  const { data, error } = await supabase.functions.invoke('send-trip-invite', {
+    body: { tripId, email, role },
   })
-  if (error) throw new Error(error.message)
-  return (data as InviteResult) ?? { status: 'invited' }
+  if (error) await throwFunctionInvokeError(error)
+  if (data?.error) throw new Error(String(data.error))
+  return data as InviteResult
 }
 
 export async function unshareTrip(tripId: string, userId: string): Promise<void> {
   const { error } = await supabase.rpc('remove_member', { p_trip: tripId, p_user: userId })
+  if (error) throw new Error(error.message)
+}
+
+export async function removePendingInvite(tripId: string, inviteId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_pending_invite', {
+    p_trip: tripId,
+    p_invite: inviteId,
+  })
   if (error) throw new Error(error.message)
 }
