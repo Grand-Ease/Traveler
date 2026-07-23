@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Trip } from './types'
-import { supabase, supabaseConfigError } from './supabase/client'
+import { hasPersistedSession, supabase, supabaseConfigError } from './supabase/client'
 import * as store from './store/store'
 import SignIn from './components/SignIn'
 import Home from './components/Home'
@@ -27,25 +27,37 @@ async function claimInvites() {
 }
 
 export default function App() {
-  const [authed, setAuthed] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const [hadPersistedSession] = useState(() => hasPersistedSession())
+  const [authed, setAuthed] = useState(hadPersistedSession)
+  const [checking, setChecking] = useState(!hadPersistedSession)
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
 
   useEffect(() => {
     if (supabaseConfigError) return
     let mounted = true
 
-    // getSession() reads the persisted session locally (no network), so
-    // returning users — including offline — are authed instantly without a
-    // hang on the splash screen.
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return
-      setAuthed(!!data.session)
-      setChecking(false)
-      // Claim invites on session restore too, so users with pending email
-      // invites get shared trips after a normal reload (not just at sign-in).
-      if (data.session) void claimInvites()
-    })
+    // Supabase initialization may refresh an expired token over the network.
+    // Never hold the launch screen for that work; returning users already see
+    // their locally cached app via the persisted-session hint above.
+    const splashTimeout = window.setTimeout(() => {
+      if (mounted) setChecking(false)
+    }, 1500)
+
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return
+        setAuthed(!!data.session)
+        // Claim invites on session restore too, so users with pending email
+        // invites get shared trips after a normal reload (not just at sign-in).
+        if (data.session) void claimInvites()
+      })
+      .catch((error: unknown) => {
+        console.warn('Session restore failed:', (error as Error).message)
+      })
+      .finally(() => {
+        if (mounted) setChecking(false)
+      })
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
@@ -57,9 +69,10 @@ export default function App() {
 
     return () => {
       mounted = false
+      window.clearTimeout(splashTimeout)
       sub.subscription.unsubscribe()
     }
-  }, [])
+  }, [hadPersistedSession])
 
   // Not configured: show a clear, visible message instead of failing silently.
   if (supabaseConfigError) {
