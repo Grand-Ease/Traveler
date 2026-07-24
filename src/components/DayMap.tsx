@@ -169,10 +169,12 @@ export default function DayMap({ items, cats }: Props) {
           label: { text: String(i + 1), color: '#ffffff', fontSize: '12px' },
           title: p.kind ? `${p.title} (${p.kind})` : p.title,
         })
+        // Title (and optional kind) go in headerContent so Google's header row
+        // for the close button doesn't leave blank space above the text.
         const info = new maps.InfoWindow({
-          content: `<div style="color:#111;font-size:13px;font-weight:600">${escapeHtml(
-            p.title,
-          )}</div>${p.kind ? `<div style="color:#555;font-size:12px">${p.kind}</div>` : ''}`,
+          headerContent: p.kind
+            ? `<div style="font-weight:600">${escapeHtml(p.title)}</div><div style="color:#555;font-size:12px;font-weight:400">${escapeHtml(p.kind)}</div>`
+            : escapeHtml(p.title),
         })
         const listener = marker.addListener('click', () =>
           info.open({ map, anchor: marker }),
