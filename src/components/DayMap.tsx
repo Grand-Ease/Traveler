@@ -32,6 +32,7 @@ interface GMap {
   fitBounds(bounds: GLatLngBounds, padding?: number): void
   setCenter(p: GLatLngLiteral): void
   setZoom(z: number): void
+  addListener(ev: string, cb: () => void): { remove: () => void }
 }
 interface GMarker {
   setMap(m: GMap | null): void
@@ -43,6 +44,8 @@ interface GPolyline {
 }
 interface GInfoWindow {
   open(opts: { map: GMap; anchor: GMarker }): void
+  close(): void
+  setContent(content: HTMLElement | string): void
 }
 interface GLatLngBounds {
   extend(p: GLatLngLiteral): void
@@ -156,6 +159,19 @@ export default function DayMap({ items, cats }: Props) {
         gestureHandling: 'greedy',
         zoomControl: true,
       })
+      const infoWindow = new maps.InfoWindow({
+        headerDisabled: true,
+        maxWidth: 260,
+      })
+      let openMarker: GMarker | null = null
+
+      const mapClickListener = map.addListener('click', () => {
+        infoWindow.close()
+        openMarker = null
+      })
+      cleanups.push(() => mapClickListener.remove())
+      cleanups.push(() => infoWindow.close())
+
       const bounds = new maps.LatLngBounds()
       const path: GLatLngLiteral[] = []
 
@@ -169,16 +185,18 @@ export default function DayMap({ items, cats }: Props) {
           label: { text: String(i + 1), color: '#ffffff', fontSize: '12px' },
           title: p.kind ? `${p.title} (${p.kind})` : p.title,
         })
-        // Title (and optional kind) go in headerContent so Google's header row
-        // for the close button doesn't leave blank space above the text.
-        const info = new maps.InfoWindow({
-          headerContent: p.kind
-            ? `<div style="font-weight:600">${escapeHtml(p.title)}</div><div style="color:#555;font-size:12px;font-weight:400">${escapeHtml(p.kind)}</div>`
-            : escapeHtml(p.title),
+        // One shared InfoWindow: text stays visible, only one popup at a time,
+        // and tapping the map or the same marker again closes it.
+        const listener = marker.addListener('click', () => {
+          if (openMarker === marker) {
+            infoWindow.close()
+            openMarker = null
+            return
+          }
+          infoWindow.setContent(buildInfoContent(p.title, p.kind))
+          infoWindow.open({ map, anchor: marker })
+          openMarker = marker
         })
-        const listener = marker.addListener('click', () =>
-          info.open({ map, anchor: marker }),
-        )
         cleanups.push(() => listener.remove())
         cleanups.push(() => marker.setMap(null))
         bounds.extend(pos)
@@ -254,10 +272,22 @@ export default function DayMap({ items, cats }: Props) {
   )
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+function buildInfoContent(title: string, kind: string): HTMLElement {
+  const wrap = document.createElement('div')
+  wrap.style.cssText =
+    'color:#111;font-family:system-ui,-apple-system,sans-serif;line-height:1.3;margin:0;padding:0;'
+
+  const titleEl = document.createElement('div')
+  titleEl.style.cssText = 'font-size:13px;font-weight:600;margin:0;padding:0;'
+  titleEl.textContent = title
+  wrap.appendChild(titleEl)
+
+  if (kind) {
+    const kindEl = document.createElement('div')
+    kindEl.style.cssText = 'color:#555;font-size:12px;margin:2px 0 0;padding:0;'
+    kindEl.textContent = kind
+    wrap.appendChild(kindEl)
+  }
+
+  return wrap
 }
