@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ItineraryItem, Trip } from '../types'
 import {
+  cityRegionName,
   effectivePlacesForDay,
   setDayPlaces,
 } from './locations'
@@ -125,6 +126,47 @@ describe('effective day locations', () => {
     ])
   })
 
+  it('shows only the city and state for a US lodging address', () => {
+    const lodging: ItineraryItem = {
+      type: 'lodging',
+      title: 'Bellagio',
+      date: '2026-07-01',
+      location: 'Bellagio Hotel, 3600 S Las Vegas Blvd, Las Vegas, NV 89109, USA',
+    }
+
+    expect(effectivePlacesForDay(trip(), [lodging], '2026-07-01').places).toEqual([
+      { time: '00:00', name: 'Las Vegas, NV', tz: undefined },
+    ])
+  })
+
+  it('shows only the city and country for a non-US lodging address', () => {
+    const lodging: ItineraryItem = {
+      type: 'lodging',
+      title: 'Hotel Sacher',
+      date: '2026-07-01',
+      location: 'Hotel Sacher, Philharmoniker Strasse 4, 1010 Wien, Austria',
+    }
+
+    expect(effectivePlacesForDay(trip(), [lodging], '2026-07-01').places).toEqual([
+      { time: '00:00', name: 'Wien, Austria', tz: undefined },
+    ])
+  })
+
+  it('deduplicates a lodging address against an arrival in the same city', () => {
+    const lodging: ItineraryItem = {
+      type: 'lodging',
+      title: 'Bellagio',
+      date: '2026-07-01',
+      location: 'Bellagio Hotel, 3600 S Las Vegas Blvd, Las Vegas, NV 89109, USA',
+    }
+    const flight = travel({ from: 'Paris, France', to: 'Las Vegas, NV 89119, USA' })
+
+    expect(effectivePlacesForDay(trip(), [lodging, flight], '2026-07-01').places).toEqual([
+      { time: '00:00', name: 'Paris, France' },
+      { time: '10:00', name: 'Las Vegas, NV' },
+    ])
+  })
+
   it('limits generated timelines to three places while preserving the final place', () => {
     const items = [
       travel({ endTime: '09:00', to: 'A' }),
@@ -137,5 +179,27 @@ describe('effective day locations', () => {
       { time: '09:00', name: 'A' },
       { time: '14:00', name: 'C' },
     ])
+  })
+})
+
+describe('cityRegionName', () => {
+  it('keeps names that carry no address detail', () => {
+    expect(cityRegionName('London')).toBe('London')
+    expect(cityRegionName('Los Angeles International Airport (LAX)')).toBe(
+      'Los Angeles International Airport (LAX)',
+    )
+    expect(cityRegionName('Paris, France')).toBe('Paris, France')
+  })
+
+  it('skips county-level components in US addresses', () => {
+    expect(
+      cityRegionName(
+        'Bellagio, 3600, South Las Vegas Boulevard, Paradise, Clark County, Nevada, 89109, United States',
+      ),
+    ).toBe('Paradise, Nevada')
+  })
+
+  it('strips postal codes from the retained components', () => {
+    expect(cityRegionName('10 Downing St, London SW1A 2AA, UK')).toBe('London, UK')
   })
 })

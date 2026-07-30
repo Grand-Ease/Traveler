@@ -13,13 +13,53 @@ export interface EffectiveDayLocations {
   inherited: boolean
 }
 
+const US_COUNTRY_NAMES = new Set(['us', 'usa', 'united states', 'united states of america'])
+const ADMIN_AREA = /\b(county|parish|borough|municipality)\b/i
+
 function placeKey(name: string): string {
   return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
 }
 
+/** Drop postal codes so an address component reduces to a bare place name. */
+function withoutPostalCode(part: string): string {
+  return part
+    .replace(/\b\d{4,6}(?:-\d{4})?\b/g, ' ')
+    .replace(/\b[A-Z]{1,2}\d[A-Z\d]?(?:\s+\d[A-Z]{2})?\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Reduce a venue name or full street address to "City, State" in the US and
+ * "City, Country" elsewhere. Addresses are read from the end, where the
+ * administrative components live, so leading hotel/venue names fall away.
+ */
+export function cityRegionName(raw: string): string {
+  const trimmed = raw.trim()
+  const parts = trimmed.split(',').map(withoutPostalCode).filter(Boolean)
+  if (parts.length < 2) return trimmed
+
+  const country = parts[parts.length - 1]
+  const region = parts[parts.length - 2]
+  if (!US_COUNTRY_NAMES.has(country.toLowerCase().replace(/\./g, ''))) {
+    return `${region}, ${country}`
+  }
+
+  // US addresses end with the state, putting the city one component earlier.
+  let cityIdx = parts.length - 3
+  while (cityIdx > 0 && ADMIN_AREA.test(parts[cityIdx])) cityIdx--
+  const city = cityIdx >= 0 ? parts[cityIdx] : ''
+  return city ? `${city}, ${region}` : `${region}, ${country}`
+}
+
 function locationOf(item: ItineraryItem, leg: 'origin' | 'destination'): string {
   const value = leg === 'origin' ? item.from || item.location : item.to || item.location
-  return (value || '').trim()
+  return cityRegionName(value || '')
+}
+
+/** Lodging contributes its city, not the hotel name and street address. */
+function lodgingName(item: ItineraryItem): string {
+  return cityRegionName(item.location || '')
 }
 
 function activeLodgings(items: ItineraryItem[], day: string): ItineraryItem[] {
@@ -102,11 +142,11 @@ export function deriveDayPlaces(
   const lodgings = activeLodgings(items, day)
   const lodging = [...lodgings]
     .reverse()
-    .find((item) => !arrivalNames.has(placeKey(item.location || '')))
+    .find((item) => !arrivalNames.has(placeKey(lodgingName(item))))
 
   let baseline = previousPlaces[previousPlaces.length - 1]
-  if (lodging?.location?.trim()) {
-    baseline = { time: '00:00', name: lodging.location.trim(), tz: lodging.timezone }
+  if (lodging) {
+    baseline = { time: '00:00', name: lodgingName(lodging), tz: lodging.timezone }
   } else if (!baseline) {
     const origin = firstOrigin(items, day)
     if (origin) baseline = { time: '00:00', name: origin }
@@ -145,13 +185,12 @@ export function effectivePlacesForDay(
       result = { places, source: 'explicit', inherited: false }
     } else {
       const places = deriveDayPlaces(items, current, previousPlaces)
-      const hasArrival = arrivalsForDay(items, current).length > 0
-      const hasLodgingBaseline = activeLodgings(items, current).some((item) => {
-        const arrivals = new Set(
-          arrivalsForDay(items, current).map(({ place }) => placeKey(place.name)),
-        )
-        return !arrivals.has(placeKey(item.location || ''))
-      })
+      const arrivals = arrivalsForDay(items, current)
+      const arrivalNames = new Set(arrivals.map(({ place }) => placeKey(place.name)))
+      const hasArrival = arrivals.length > 0
+      const hasLodgingBaseline = activeLodgings(items, current).some(
+        (item) => !arrivalNames.has(placeKey(lodgingName(item))),
+      )
       const hasOriginBaseline = !previousPlaces.length && !!firstOrigin(items, current)
       const derived = hasArrival || hasLodgingBaseline || hasOriginBaseline
       const source: DayLocationSource = derived
