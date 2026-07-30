@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronRight, MapPin, Plus, X } from 'lucide-react'
 import type { DayPlace } from '../types'
 import {
@@ -22,10 +22,35 @@ interface Props {
 // large and yellow; others are smaller and white. Editing a location detects
 // its timezone automatically.
 export default function DayLocations({ places, source, day, canEdit, onSave }: Props) {
+  const [, refreshClock] = useState(0)
   const active = activePlaceIndex(places, refTimeForDay(day))
   const [draft, setDraft] = useState<DayPlace[] | null>(null)
   const [detecting, setDetecting] = useState<Record<number, boolean>>({})
   const [saving, setSaving] = useState(false)
+  const scrollerRef = useRef<HTMLDivElement | null>(null)
+  const activeRef = useRef<HTMLDivElement | null>(null)
+
+  // Keep the active location in sync as today's timeline advances.
+  useEffect(() => {
+    const timer = window.setInterval(() => refreshClock((tick) => tick + 1), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  // Whenever the day or active place changes, center it in the horizontal row.
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    const current = activeRef.current
+    if (!scroller || !current) return
+    const scrollerBox = scroller.getBoundingClientRect()
+    const currentBox = current.getBoundingClientRect()
+    const left =
+      scroller.scrollLeft +
+      currentBox.left -
+      scrollerBox.left +
+      currentBox.width / 2 -
+      scroller.clientWidth / 2
+    scroller.scrollTo({ left, behavior: 'smooth' })
+  }, [active, day, places])
 
   function beginEdit(addBlank = false) {
     if (!canEdit) return
@@ -157,7 +182,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
     )
   }
 
-  // ---- read-only (centered, places side-by-side; fixed height) ----
+  // ---- read-only (single horizontally scrolling row) ----
   if (!places.length) {
     return (
       <div className="h-9 flex items-center justify-center">
@@ -174,18 +199,24 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
   }
 
   return (
-    <div className="h-9 flex items-center justify-center">
+    <div className="h-9 overflow-hidden">
       <div
-        className={`flex items-center justify-center flex-wrap gap-x-2 ${
+        ref={scrollerRef}
+        className={`flex h-full w-full items-center gap-x-2 overflow-x-auto overflow-y-hidden whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
           canEdit ? 'cursor-pointer' : ''
         }`}
         onClick={canEdit ? () => beginEdit() : undefined}
       >
+        <div className="w-1/2 shrink-0" aria-hidden="true" />
         {places.map((p, i) => {
           const isActive = i === active
           const tzTag = p.tz ? tzAbbrev(p.tz) : ''
           return (
-            <div key={i} className="flex items-center gap-1.5">
+            <div
+              key={i}
+              ref={isActive ? activeRef : undefined}
+              className="flex shrink-0 items-center gap-1.5"
+            >
               {i > 0 && <ChevronRight size={16} className="text-white/30 shrink-0" />}
               <MapPin
                 size={isActive ? 18 : 13}
@@ -194,7 +225,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
               <span
                 className={`whitespace-nowrap ${
                   isActive ? 'text-2xl font-bold text-yellow-300' : 'text-base text-white/80'
-                }`}
+                } ${source === 'derived' ? 'italic' : ''}`}
               >
                 {p.name}
               </span>
@@ -211,11 +242,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
             </div>
           )
         })}
-        {source !== 'explicit' && (
-          <span className="text-[10px] uppercase tracking-wide text-white/35">
-            {source === 'inherited' ? 'Previous day' : 'Automatic'}
-          </span>
-        )}
+        <div className="w-1/2 shrink-0" aria-hidden="true" />
       </div>
     </div>
   )
