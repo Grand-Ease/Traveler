@@ -1,5 +1,5 @@
 import tzlookup from 'tz-lookup'
-import type { ItineraryItem } from '../types'
+import type { DayPlace, ItineraryItem } from '../types'
 import { getMapsKey } from '../config'
 import { loadGoogleMaps } from './googleMaps'
 import {
@@ -314,6 +314,17 @@ export async function timezoneForQuery(
   } catch {
     return null
   }
+}
+
+/** Fill missing day-place timezones through the normal cached resolver. */
+export async function enrichPlaceTimezones(places: DayPlace[]): Promise<DayPlace[]> {
+  return Promise.all(
+    places.map(async (place) => {
+      if (place.tz) return { ...place }
+      const tz = await timezoneForQuery(place.name)
+      return tz ? { ...place, tz } : { ...place }
+    }),
+  )
 }
 
 /**

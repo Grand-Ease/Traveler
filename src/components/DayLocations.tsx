@@ -1,13 +1,18 @@
 import { useState } from 'react'
 import { ChevronRight, MapPin, Plus, X } from 'lucide-react'
-import type { DayPlace, Trip } from '../types'
-import { activePlaceIndex, placesForDay, refTimeForDay } from '../lib/locations'
+import type { DayPlace } from '../types'
+import {
+  activePlaceIndex,
+  refTimeForDay,
+  type DayLocationSource,
+} from '../lib/locations'
 import { timezoneForQuery } from '../lib/geo'
 import { tzAbbrev } from '../lib/timezones'
 import { formatTime } from '../lib/format'
 
 interface Props {
-  trip: Trip
+  places: DayPlace[]
+  source: DayLocationSource
   day: string
   canEdit: boolean
   onSave: (places: DayPlace[]) => void
@@ -16,8 +21,7 @@ interface Props {
 // Editable per-day destination(s). The active place (by time of day) is shown
 // large and yellow; others are smaller and white. Editing a location detects
 // its timezone automatically.
-export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
-  const { places } = placesForDay(trip, day)
+export default function DayLocations({ places, source, day, canEdit, onSave }: Props) {
   const active = activePlaceIndex(places, refTimeForDay(day))
   const [draft, setDraft] = useState<DayPlace[] | null>(null)
   const [detecting, setDetecting] = useState<Record<number, boolean>>({})
@@ -110,13 +114,27 @@ export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
           </div>
         ))}
         <div className="flex items-center justify-between">
-          <button
-            onClick={addRow}
-            disabled={draft.length >= 3}
-            className="inline-flex items-center gap-1 text-sm text-teal disabled:text-white/30"
-          >
-            <Plus size={16} /> Add place
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={addRow}
+              disabled={draft.length >= 3}
+              className="inline-flex items-center gap-1 text-sm text-teal disabled:text-white/30"
+            >
+              <Plus size={16} /> Add place
+            </button>
+            {source === 'explicit' && (
+              <button
+                className="text-xs text-white/50 hover:text-white"
+                onClick={() => {
+                  onSave([])
+                  setDraft(null)
+                  setDetecting({})
+                }}
+              >
+                Use automatic
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               className="btn-ghost !py-1.5"
@@ -193,6 +211,11 @@ export default function DayLocations({ trip, day, canEdit, onSave }: Props) {
             </div>
           )
         })}
+        {source !== 'explicit' && (
+          <span className="text-[10px] uppercase tracking-wide text-white/35">
+            {source === 'inherited' ? 'Previous day' : 'Automatic'}
+          </span>
+        )}
       </div>
     </div>
   )

@@ -9,9 +9,9 @@ import {
 } from '../types'
 import * as store from '../store/store'
 import { TYPE_LABEL } from '../lib/format'
-import { dayTimezone } from '../lib/locations'
+import { activePlaceIndex, effectivePlacesForDay } from '../lib/locations'
 import { deviceTimezone, tzAbbrev } from '../lib/timezones'
-import { hasLocation, timezoneForItem } from '../lib/geo'
+import { hasLocation, timezoneForItem, timezoneForQuery } from '../lib/geo'
 import { iconFor, TYPE_ICONS } from './icons'
 import LocationInput from './LocationInput'
 import Modal from './Modal'
@@ -21,6 +21,8 @@ interface Props {
   initial: ItineraryItem
   /** Trip whose day destinations supply a default timezone. */
   trip?: Trip
+  /** Itinerary evidence used to derive the effective day timeline. */
+  itineraryItems?: ItineraryItem[]
   onClose: () => void
   onSaved: (item: ItineraryItem, isNew: boolean) => void
 }
@@ -37,7 +39,14 @@ function addOneHour(hhmm: string): string {
   return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
 }
 
-export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }: Props) {
+export default function ItemForm({
+  calendarId,
+  trip,
+  itineraryItems = [],
+  initial,
+  onClose,
+  onSaved,
+}: Props) {
   const [item, setItem] = useState<ItineraryItem>({ ...initial })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -54,6 +63,15 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
 
   const set = <K extends keyof ItineraryItem>(k: K, v: ItineraryItem[K]) =>
     setItem((p) => ({ ...p, [k]: v }))
+
+  // Notes are a single point in time, so drop any end values carried over from
+  // the type they were switched away from (new items start as an activity).
+  const changeType = (t: ItemType) =>
+    setItem((p) => ({
+      ...p,
+      type: t,
+      ...(t === 'note' ? { endTime: undefined, endDate: undefined } : {}),
+    }))
 
   // Auto-detect the destination timezone from the location as the user types.
   const debounceRef = useRef<number | undefined>(undefined)
@@ -91,13 +109,14 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
       // then the day's active destination, then whatever was already set
       // (falling back to the device tz at render time).
       let toSave = item
-      if (hasLocation(item)) {
-        const tz = (await timezoneForItem(item)) || item.timezone
-        toSave = { ...item, timezone: tz }
-      } else if (!item.timezone && trip) {
-        const tz = dayTimezone(trip, item.date, item.startTime)
-        if (tz) toSave = { ...item, timezone: tz }
+      let tz = hasLocation(item) ? await timezoneForItem(item) : null
+      if (!tz && trip) {
+        const places = effectivePlacesForDay(trip, itineraryItems, item.date).places
+        const index = activePlaceIndex(places, item.startTime || '00:00')
+        const place = places[Math.max(0, index)]
+        tz = place ? place.tz || (await timezoneForQuery(place.name)) : null
       }
+      if (tz || item.timezone) toSave = { ...item, timezone: tz || item.timezone }
       const saved = isNew
         ? store.addItem(calendarId, toSave)
         : store.updateItem(calendarId, toSave)
@@ -159,7 +178,7 @@ export default function ItemForm({ calendarId, trip, initial, onClose, onSaved }
               return (
                 <button
                   key={t}
-                  onClick={() => set('type', t)}
+                  onClick={() => changeType(t)}
                   className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-xs ${
                     active
                       ? 'bg-teal/20 border-teal text-white'

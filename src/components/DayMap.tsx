@@ -61,12 +61,18 @@ interface GMapsApi {
 interface Props {
   /** The whole day's items (already the day, not the list filter). */
   items: ItineraryItem[]
+  /** Displayed day, used to place cross-day travel legs correctly. */
+  day: string
   /** Which map categories are enabled. */
   cats: Record<MapCat, boolean>
 }
 
 /** Build the ordered, category-filtered list of points for the day. */
-function buildPoints(items: ItineraryItem[], cats: Record<MapCat, boolean>): MapPoint[] {
+function buildPoints(
+  items: ItineraryItem[],
+  day: string,
+  cats: Record<MapCat, boolean>,
+): MapPoint[] {
   const ordered = [...items].sort((a, b) =>
     (a.startTime || '99').localeCompare(b.startTime || '99'),
   )
@@ -74,9 +80,11 @@ function buildPoints(items: ItineraryItem[], cats: Record<MapCat, boolean>): Map
   for (const it of ordered) {
     if (it.type === 'travel') {
       const dep = (it.from || it.location || '').trim()
-      if (cats.departure && dep) points.push({ address: dep, title: it.title, kind: 'Departure' })
+      if (cats.departure && it.date === day && dep)
+        points.push({ address: dep, title: it.title, kind: 'Departure' })
       const arr = (it.to || it.location || '').trim()
-      if (cats.arrival && arr) points.push({ address: arr, title: it.title, kind: 'Arrival' })
+      if (cats.arrival && (it.endDate || it.date) === day && arr)
+        points.push({ address: arr, title: it.title, kind: 'Arrival' })
     } else {
       const cat = it.type as MapCat
       if (!cats[cat]) continue
@@ -87,13 +95,13 @@ function buildPoints(items: ItineraryItem[], cats: Record<MapCat, boolean>): Map
   return points
 }
 
-export default function DayMap({ items, cats }: Props) {
+export default function DayMap({ items, day, cats }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'nokey' | 'error'>(
     'loading',
   )
 
-  const points = useMemo(() => buildPoints(items, cats), [items, cats])
+  const points = useMemo(() => buildPoints(items, day, cats), [items, day, cats])
 
   // Ordered, consecutive-deduped addresses for the "Get directions" link.
   const directionStops = useMemo(() => {

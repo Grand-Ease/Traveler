@@ -12,8 +12,15 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { DayPlace, ItineraryItem, Trip } from '../types'
-import { addDays, eachDay, weekdayLong } from '../lib/format'
-import { activePlaceIndex, placesForDay, refTimeForDay, setDayPlaces } from '../lib/locations'
+import { addDays, weekdayLong } from '../lib/format'
+import { itemAffectsDay, tripDays } from '../lib/itineraryDay'
+import {
+  activePlaceIndex,
+  effectivePlacesForDay,
+  refTimeForDay,
+  setDayPlaces,
+} from '../lib/locations'
+import { enrichPlaceTimezones } from '../lib/geo'
 import * as store from '../store/store'
 import { useItems, useTrip } from '../store/hooks'
 import { TYPE_ICONS } from './icons'
@@ -79,26 +86,10 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
   const canEdit = trip.accessRole !== 'reader'
 
   // All days = trip range unioned with any item dates that fall outside.
-  const days = useMemo(() => {
-    const set = new Set<string>()
-    if (trip.startDate && trip.endDate)
-      for (const d of eachDay(trip.startDate, trip.endDate)) set.add(d)
-    for (const it of items) {
-      if (it.date) set.add(it.date)
-    }
-    const arr = [...set].sort()
-    return arr.length ? arr : [trip.startDate || new Date().toISOString().slice(0, 10)]
-  }, [items, trip.startDate, trip.endDate])
+  const days = useMemo(() => tripDays(trip, items), [items, trip])
 
-  // Which items appear on a given day (lodging spans its nights).
   function itemsOnDay(day: string): ItineraryItem[] {
-    return items.filter((it) => {
-      if (it.type === 'lodging') {
-        const nights = Math.max(1, it.nights || 1)
-        return day >= it.date && day < addDays(it.date, nights)
-      }
-      return it.date === day
-    })
+    return items.filter((item) => itemAffectsDay(item, day))
   }
 
   useEffect(() => {
@@ -113,8 +104,27 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
   const day = days.includes(selectedDay) ? selectedDay : days[0]
   const dayIndex = Math.max(0, days.indexOf(day))
 
+  const effectiveLocations = useMemo(
+    () => effectivePlacesForDay(trip, items, day),
+    [trip, items, day],
+  )
+  const [dayPlaces, setDayPlacesWithTimezones] = useState(effectiveLocations.places)
+
+  // Dynamic places are transient; enrich their missing timezones through the
+  // geocoding cache without persisting them into trip.locations.
+  useEffect(() => {
+    let cancelled = false
+    setDayPlacesWithTimezones(effectiveLocations.places)
+    if (effectiveLocations.source === 'explicit') return
+    void enrichPlaceTimezones(effectiveLocations.places).then((places) => {
+      if (!cancelled) setDayPlacesWithTimezones(places)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [effectiveLocations])
+
   // The day's active destination (used for the header weather lookup).
-  const dayPlaces = placesForDay(trip, day).places
   const activePlaceName = dayPlaces[activePlaceIndex(dayPlaces, refTimeForDay(day))]?.name
 
   // The whole day's items (the map uses these; it applies `cats` itself).
@@ -210,7 +220,13 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
             <SyncBadge />
           </div>
           <div className="bg-headerCard border border-white/20 rounded-2xl p-4">
-            <DayLocations trip={trip} day={day} canEdit={canEdit} onSave={saveDayPlaces} />
+            <DayLocations
+              places={dayPlaces}
+              source={effectiveLocations.source}
+              day={day}
+              canEdit={canEdit}
+              onSave={saveDayPlaces}
+            />
             <div className="flex items-center justify-between mt-2">
               <button
                 onClick={goPrev}
@@ -294,7 +310,7 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
       {viewMode === 'map' ? (
         /* Map fills the middle region and manages its own gestures. */
         <div className="flex-1 min-h-0">
-          <DayMap items={allDayItems} cats={cats} />
+          <DayMap items={allDayItems} day={day} cats={cats} />
         </div>
       ) : (
         /* Items (only this region scrolls vertically) */
@@ -360,11 +376,14 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
         <ItemForm
           calendarId={trip.id}
           trip={trip}
+          itineraryItems={items}
           initial={editing}
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
             setEditing(null)
-            // Stay on the day the item lives on (usually the current day).
+            // Keep the current day when the saved item still belongs on it
+            // (e.g. editing an arrival leg while viewing the arrival day).
+            if (itemAffectsDay(saved, day)) return
             if (saved.date) setSelectedDay(saved.date)
           }}
         />
