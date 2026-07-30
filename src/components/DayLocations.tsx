@@ -38,6 +38,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
 
   // Whenever the day or active place changes, center it in the horizontal row.
   useEffect(() => {
+    if (places.length <= 1) return
     const scroller = scrollerRef.current
     const current = activeRef.current
     if (!scroller || !current) return
@@ -198,16 +199,24 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
     )
   }
 
+  const canScroll = places.length > 1
+
   return (
     <div className="h-9 overflow-hidden">
       <div
         ref={scrollerRef}
-        className={`flex h-full w-full items-center gap-x-2 overflow-x-auto overflow-y-hidden whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-          canEdit ? 'cursor-pointer' : ''
-        }`}
+        className={`flex h-full w-full items-center gap-x-2 whitespace-nowrap ${
+          canScroll
+            ? 'overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+            : 'justify-center overflow-hidden'
+        } ${canEdit ? 'cursor-pointer' : ''}`}
         onClick={canEdit ? () => beginEdit() : undefined}
+        // Keep location pans from reaching TripDetail's day-swipe handlers.
+        onTouchStart={canScroll ? (e) => e.stopPropagation() : undefined}
+        onTouchMove={canScroll ? (e) => e.stopPropagation() : undefined}
+        onTouchEnd={canScroll ? (e) => e.stopPropagation() : undefined}
       >
-        <div className="w-1/2 shrink-0" aria-hidden="true" />
+        {canScroll && <div className="w-1/2 shrink-0" aria-hidden="true" />}
         {places.map((p, i) => {
           const isActive = i === active
           const tzTag = p.tz ? tzAbbrev(p.tz) : ''
@@ -242,7 +251,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
             </div>
           )
         })}
-        <div className="w-1/2 shrink-0" aria-hidden="true" />
+        {canScroll && <div className="w-1/2 shrink-0" aria-hidden="true" />}
       </div>
     </div>
   )
