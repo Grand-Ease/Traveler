@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Secrets — never commit. .env.example documents the required keys instead.
+.env
+.env.*
+!.env.example
+client_secret_*.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
