@@ -3,6 +3,7 @@ import type { ItineraryItem, Trip } from '../types'
 import {
   cityRegionName,
   effectivePlacesForDay,
+  samePlace,
   setDayPlaces,
 } from './locations'
 
@@ -65,6 +66,53 @@ describe('effective day locations', () => {
     })
   })
 
+  it('orders multi-leg travel by arrival time', () => {
+    const items = [
+      travel({
+        startTime: '14:00',
+        endTime: '16:00',
+        from: 'Cusco, Peru',
+        to: 'Lima, Peru',
+      }),
+      travel({
+        startTime: '07:00',
+        endTime: '08:30',
+        from: 'Arequipa, Peru',
+        to: 'Cusco, Peru',
+      }),
+    ]
+
+    expect(effectivePlacesForDay(trip(), items, '2026-07-01').places).toEqual([
+      { time: '00:00', name: 'Arequipa' },
+      { time: '08:30', name: 'Cusco' },
+      { time: '16:00', name: 'Lima' },
+    ])
+  })
+
+  it('keeps the prior city until a same-day lodging arrival later', () => {
+    const lodging: ItineraryItem = {
+      type: 'lodging',
+      title: 'Hotel',
+      date: '2026-07-02',
+      nights: 1,
+      location: 'Miraflores, Lima, Peru',
+    }
+    const flight = travel({
+      date: '2026-07-01',
+      endDate: '2026-07-02',
+      startTime: '22:00',
+      endTime: '07:30',
+      from: 'Cusco, Peru',
+      to: 'Lima',
+    })
+
+    // Shared country is omitted across the day's places.
+    expect(effectivePlacesForDay(trip(), [lodging, flight], '2026-07-02').places).toEqual([
+      { time: '00:00', name: 'Cusco' },
+      { time: '07:30', name: 'Lima' },
+    ])
+  })
+
   it('puts an overnight travel destination on its arrival day', () => {
     const item = travel({
       date: '2026-07-01',
@@ -109,20 +157,20 @@ describe('effective day locations', () => {
     })
   })
 
-  it('deduplicates consecutive equivalent locations', () => {
+  it('deduplicates Lima and Lima, Peru as the same place', () => {
     const items = [
-      travel({ to: ' london ' }),
+      travel({ from: 'Cusco', to: 'Lima', endTime: '10:00' }),
       travel({
         startTime: '11:00',
         endTime: '13:00',
-        from: 'London',
-        to: 'LONDON',
+        from: 'Lima, Peru',
+        to: 'lima',
       }),
     ]
 
     expect(effectivePlacesForDay(trip(), items, '2026-07-01').places).toEqual([
-      { time: '00:00', name: 'Paris' },
-      { time: '10:00', name: 'london' },
+      { time: '00:00', name: 'Cusco' },
+      { time: '10:00', name: 'Lima, Peru' },
     ])
   })
 
@@ -167,6 +215,50 @@ describe('effective day locations', () => {
     ])
   })
 
+  it('keeps the shared region when only one place is shown', () => {
+    const lodging: ItineraryItem = {
+      type: 'lodging',
+      title: 'Hotel',
+      date: '2026-07-01',
+      nights: 1,
+      location: 'Lima, Peru',
+    }
+
+    expect(effectivePlacesForDay(trip(), [lodging], '2026-07-01').places).toEqual([
+      { time: '00:00', name: 'Lima, Peru', tz: undefined },
+    ])
+  })
+
+  it('keeps differing regions when cities are in different states', () => {
+    const items = [
+      travel({
+        from: 'Las Vegas, NV, USA',
+        to: 'Los Angeles, CA, USA',
+        endTime: '11:00',
+      }),
+    ]
+
+    expect(effectivePlacesForDay(trip(), items, '2026-07-01').places).toEqual([
+      { time: '00:00', name: 'Las Vegas, NV' },
+      { time: '11:00', name: 'Los Angeles, CA' },
+    ])
+  })
+
+  it('omits a shared state across same-state cities', () => {
+    const items = [
+      travel({
+        from: 'Las Vegas, NV, USA',
+        to: 'Reno, NV, USA',
+        endTime: '11:00',
+      }),
+    ]
+
+    expect(effectivePlacesForDay(trip(), items, '2026-07-01').places).toEqual([
+      { time: '00:00', name: 'Las Vegas' },
+      { time: '11:00', name: 'Reno' },
+    ])
+  })
+
   it('limits generated timelines to three places while preserving the final place', () => {
     const items = [
       travel({ endTime: '09:00', to: 'A' }),
@@ -183,12 +275,11 @@ describe('effective day locations', () => {
 })
 
 describe('cityRegionName', () => {
-  it('keeps names that carry no address detail', () => {
+  it('keeps bare city names and strips airport noise', () => {
     expect(cityRegionName('London')).toBe('London')
-    expect(cityRegionName('Los Angeles International Airport (LAX)')).toBe(
-      'Los Angeles International Airport (LAX)',
-    )
+    expect(cityRegionName('Los Angeles International Airport (LAX)')).toBe('Los Angeles')
     expect(cityRegionName('Paris, France')).toBe('Paris, France')
+    expect(cityRegionName('Lima (LIM)')).toBe('Lima')
   })
 
   it('skips county-level components in US addresses', () => {
@@ -201,5 +292,13 @@ describe('cityRegionName', () => {
 
   it('strips postal codes from the retained components', () => {
     expect(cityRegionName('10 Downing St, London SW1A 2AA, UK')).toBe('London, UK')
+  })
+})
+
+describe('samePlace', () => {
+  it('treats a bare city and city,country as equivalent', () => {
+    expect(samePlace('Lima', 'Lima, Peru')).toBe(true)
+    expect(samePlace('lima, peru', 'LIMA')).toBe(true)
+    expect(samePlace('Lima', 'Cusco')).toBe(false)
   })
 })
