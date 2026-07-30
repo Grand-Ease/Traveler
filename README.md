@@ -35,7 +35,10 @@ Google Calendar is the source of truth, but the app never blocks on the network:
 
 - **Instant + offline reads.** Trips and their items are cached in `localStorage`,
   so the app opens instantly and shows your itinerary even with no signal. A service
-  worker (`public/sw.js`) caches the app shell so the site itself loads offline too.
+  worker generated at build time by `vite-plugin-pwa` (Workbox) precaches the app
+  shell — `index.html` plus the hashed JS/CSS and images — so the site itself loads
+  offline too. Each build ships a new precache manifest and cleans up the old one,
+  so the cached shell always matches the deployed assets.
 - **Offline writes.** Adding, editing, and deleting trips or items works offline.
   Each change is applied to the local cache immediately and appended to a **pending
   queue**.
