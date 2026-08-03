@@ -211,10 +211,8 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
             : 'justify-center overflow-hidden'
         } ${canEdit ? 'cursor-pointer' : ''}`}
         onClick={canEdit ? () => beginEdit() : undefined}
-        // Keep location pans from reaching TripDetail's day-swipe handlers.
-        onTouchStart={canScroll ? (e) => e.stopPropagation() : undefined}
-        onTouchMove={canScroll ? (e) => e.stopPropagation() : undefined}
-        onTouchEnd={canScroll ? (e) => e.stopPropagation() : undefined}
+        // This row pans horizontally itself, so it opts out of the day swipe.
+        data-no-day-swipe={canScroll || undefined}
       >
         {canScroll && <div className="w-1/2 shrink-0" aria-hidden="true" />}
         {places.map((p, i) => {
