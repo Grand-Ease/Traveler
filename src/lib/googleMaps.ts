@@ -63,7 +63,7 @@ export function loadGoogleMaps(apiKey: string): Promise<MapsNamespace> {
     const s = document.createElement('script')
     s.src =
       `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}` +
-      `&libraries=geocoding,places&loading=async&callback=__grandeaseMapsReady`
+      `&libraries=geocoding,places,marker&loading=async&callback=__grandeaseMapsReady`
     s.async = true
     s.onerror = () => {
       loadPromise = null

@@ -1,7 +1,12 @@
 import { useMemo } from 'react'
 import type { ItineraryItem } from '../types'
-import { addDays } from '../lib/format'
-import { itemAffectsDay } from '../lib/itineraryDay'
+import {
+  itemAffectsDay,
+  lodgingCoversDay,
+  sortTimeForDay,
+  stayPhase,
+  type StayPhase,
+} from '../lib/itineraryDay'
 import type { MapCat } from './DayMap'
 import ItemCard from './ItemCard'
 
@@ -11,6 +16,7 @@ interface ListEntry {
   key: string
   item: ItineraryItem
   leg?: Leg
+  stay?: StayPhase
   time?: string
 }
 
@@ -50,9 +56,13 @@ export default function DayItemList({
           out.push({ key: `${it.id}-arr`, item: it, leg: 'arrival', time: it.endTime })
       } else if (it.type === 'lodging') {
         if (!cats.lodging) continue
-        const nights = Math.max(1, it.nights || 1)
-        if (day >= it.date && day < addDays(it.date, nights))
-          out.push({ key: it.id || `${it.date}-${it.title}`, item: it, time: it.startTime })
+        if (lodgingCoversDay(it, day))
+          out.push({
+            key: it.id || `${it.date}-${it.title}`,
+            item: it,
+            stay: stayPhase(it, day),
+            time: sortTimeForDay(it, day),
+          })
       } else if (cats[it.type as MapCat] && it.date === day) {
         out.push({ key: it.id || `${it.date}-${it.title}`, item: it, time: it.startTime })
       }
@@ -87,6 +97,7 @@ export default function DayItemList({
           key={entry.key}
           item={entry.item}
           leg={entry.leg}
+          stay={entry.stay}
           canEdit={canEdit}
           onEdit={() => onEdit(entry.item)}
           onDelete={() => onDelete(entry.item)}

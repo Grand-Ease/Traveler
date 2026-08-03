@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Navigation } from 'lucide-react'
+import { createRoot, type Root } from 'react-dom/client'
+import { Navigation, type LucideIcon } from 'lucide-react'
 import type { ItineraryItem } from '../types'
-import { getMapsKey } from '../config'
+import { getMapsKey, getMapsMapId } from '../config'
 import { loadGoogleMaps } from '../lib/googleMaps'
 import { geocodeToCoords, inferPlaceFromTitle, isPlaceableTitle } from '../lib/geo'
+import { sortTimeForDay } from '../lib/itineraryDay'
 import { directionsUrl } from '../lib/mapLinks'
+import { iconFor } from './icons'
 
 // Map-mode filter categories. `departure`/`arrival` split a travel item into
 // two points; the rest map 1:1 to item types.
@@ -18,6 +21,8 @@ interface MapPoint {
   kind: string
   /** Guessed from the title + day city because the item has no location. */
   inferred?: boolean
+  /** Same glyph the item shows in the list, so the two views read alike. */
+  icon: LucideIcon
 }
 
 /** Stable identity for a point's lookup, so guesses and addresses never collide. */
@@ -26,10 +31,6 @@ const pointKey = (p: MapPoint) => `${p.inferred ? 'title' : 'addr'}:${p.address}
 // Minimal typing for the parts of the Google Maps JS API we touch. The loader
 // returns the maps namespace (typed only for Geocoder in googleMaps.ts), so we
 // cast to this richer shape rather than adding a conflicting global.
-interface GLatLng {
-  lat(): number
-  lng(): number
-}
 interface GLatLngLiteral {
   lat: number
   lng: number
@@ -40,28 +41,23 @@ interface GMap {
   setZoom(z: number): void
   addListener(ev: string, cb: () => void): { remove: () => void }
 }
-interface GMarker {
-  setMap(m: GMap | null): void
-  getPosition(): GLatLng | null
+interface GAdvancedMarker {
+  map: GMap | null
   addListener(ev: string, cb: () => void): { remove: () => void }
 }
 interface GPolyline {
   setMap(m: GMap | null): void
-}
-interface GInfoWindow {
-  open(opts: { map: GMap; anchor: GMarker }): void
-  close(): void
-  setContent(content: HTMLElement | string): void
 }
 interface GLatLngBounds {
   extend(p: GLatLngLiteral): void
 }
 interface GMapsApi {
   Map: new (el: HTMLElement, opts?: Record<string, unknown>) => GMap
-  Marker: new (opts: Record<string, unknown>) => GMarker
   Polyline: new (opts: Record<string, unknown>) => GPolyline
-  InfoWindow: new (opts: Record<string, unknown>) => GInfoWindow
   LatLngBounds: new () => GLatLngBounds
+  marker: {
+    AdvancedMarkerElement: new (opts: Record<string, unknown>) => GAdvancedMarker
+  }
 }
 
 interface Props {
@@ -82,28 +78,37 @@ function buildPoints(
   cats: Record<MapCat, boolean>,
   dayCity?: string,
 ): MapPoint[] {
+  // Lodging you woke up in sorts to the top: whatever else the day holds, the
+  // journey starts at the hotel.
   const ordered = [...items].sort((a, b) =>
-    (a.startTime || '99').localeCompare(b.startTime || '99'),
+    sortTimeForDay(a, day).localeCompare(sortTimeForDay(b, day)),
   )
   const points: MapPoint[] = []
   for (const it of ordered) {
+    const icon = iconFor(it)
     if (it.type === 'travel') {
       const dep = (it.from || it.location || '').trim()
       if (cats.departure && it.date === day && dep)
-        points.push({ address: dep, title: it.title, kind: 'Departure' })
+        points.push({ address: dep, title: it.title, kind: 'Departure', icon })
       const arr = (it.to || it.location || '').trim()
       if (cats.arrival && (it.endDate || it.date) === day && arr)
-        points.push({ address: arr, title: it.title, kind: 'Arrival' })
+        points.push({ address: arr, title: it.title, kind: 'Arrival', icon })
     } else {
       const cat = it.type as MapCat
       if (!cats[cat]) continue
       const loc = (it.location || '').trim()
       if (loc) {
-        points.push({ address: loc, title: it.title, kind: '' })
+        points.push({ address: loc, title: it.title, kind: '', icon })
       } else if (dayCity && isPlaceableTitle(it.title)) {
         // No location saved, but the title names something we can look up in
         // the day's city.
-        points.push({ address: it.title.trim(), title: it.title, kind: '', inferred: true })
+        points.push({
+          address: it.title.trim(),
+          title: it.title,
+          kind: '',
+          inferred: true,
+          icon,
+        })
       }
     }
   }
@@ -137,7 +142,11 @@ export default function DayMap({ items, day, cats, dayCity }: Props) {
 
   // Signature so the map effect only re-runs when the meaningful inputs change.
   const sig = useMemo(
-    () => JSON.stringify([dayCity, points.map((p) => [p.address, p.title, p.kind, !!p.inferred])]),
+    () =>
+      JSON.stringify([
+        dayCity,
+        points.map((p) => [p.address, p.title, p.kind, !!p.inferred, p.icon.displayName]),
+      ]),
     [points, dayCity],
   )
 
@@ -200,27 +209,39 @@ export default function DayMap({ items, day, cats, dayCity }: Props) {
       }
 
       const map = new maps.Map(el, {
+        // Advanced markers require a map ID; it also drives cloud styling.
+        mapId: getMapsMapId(),
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
         gestureHandling: 'greedy',
         zoomControl: true,
       })
-      const infoWindow = new maps.InfoWindow({
-        headerDisabled: true,
-        maxWidth: 260,
-      })
-      let openMarker: GMarker | null = null
-
-      const mapClickListener = map.addListener('click', () => {
-        infoWindow.close()
-        openMarker = null
-      })
-      cleanups.push(() => mapClickListener.remove())
-      cleanups.push(() => infoWindow.close())
 
       const bounds = new maps.LatLngBounds()
       const path: GLatLngLiteral[] = []
+      // Each pin is a React root so the map reuses the list's icons directly.
+      const pins: { root: Root; point: MapPoint; stop: number }[] = []
+      let selected: number | null = null
+
+      function paint() {
+        for (const pin of pins) {
+          pin.root.render(
+            <MarkerPill
+              point={pin.point}
+              stop={pin.stop}
+              selected={selected === pin.stop}
+              guessedAddress={pin.point.inferred ? addresses[pointKey(pin.point)] : ''}
+            />,
+          )
+        }
+      }
+
+      const mapClickListener = map.addListener('click', () => {
+        selected = null
+        paint()
+      })
+      cleanups.push(() => mapClickListener.remove())
 
       // Number the markers that actually render, so the labels match the order
       // of the stops in the directions link.
@@ -230,33 +251,35 @@ export default function DayMap({ items, day, cats, dayCity }: Props) {
         if (!c) return
         const pos = { lat: c.lat, lng: c.lon }
         stopNumber += 1
-        const marker = new maps.Marker({
+        const stop = stopNumber
+
+        const content = document.createElement('div')
+        const root = createRoot(content)
+        pins.push({ root, point: p, stop })
+
+        const marker = new maps.marker.AdvancedMarkerElement({
           position: pos,
           map,
-          label: { text: String(stopNumber), color: '#ffffff', fontSize: '12px' },
-          // Guesses are dimmed so they read as less certain than saved pins.
-          opacity: p.inferred ? 0.65 : 1,
+          content,
           title: p.kind ? `${p.title} (${p.kind})` : p.title,
         })
-        // One shared InfoWindow: text stays visible, only one popup at a time,
-        // and tapping the map or the same marker again closes it.
+        // Tapping a pin names it; tapping it again or the map clears it. Only
+        // one title shows at a time, which keeps a busy day legible.
         const listener = marker.addListener('click', () => {
-          if (openMarker === marker) {
-            infoWindow.close()
-            openMarker = null
-            return
-          }
-          infoWindow.setContent(
-            buildInfoContent(p.title, p.kind, p.inferred ? addresses[pointKey(p)] : ''),
-          )
-          infoWindow.open({ map, anchor: marker })
-          openMarker = marker
+          selected = selected === stop ? null : stop
+          paint()
         })
+
         cleanups.push(() => listener.remove())
-        cleanups.push(() => marker.setMap(null))
+        cleanups.push(() => {
+          marker.map = null
+          // Deferred so React is never asked to unmount mid-render.
+          queueMicrotask(() => root.unmount())
+        })
         bounds.extend(pos)
         path.push(pos)
       })
+      paint()
 
       if (path.length >= 2) {
         const line = new maps.Polyline({
@@ -327,35 +350,57 @@ export default function DayMap({ items, day, cats, dayCity }: Props) {
   )
 }
 
-/** `guessedAddress` is set only for pins found from the title, not saved on the item. */
-function buildInfoContent(title: string, kind: string, guessedAddress: string): HTMLElement {
-  const wrap = document.createElement('div')
-  wrap.style.cssText =
-    'color:#111;font-family:system-ui,-apple-system,sans-serif;line-height:1.3;margin:0;padding:0;'
+/**
+ * A map pin: the item's own icon plus its stop number, expanding to name the
+ * place when tapped. `guessedAddress` is set only for pins found from the
+ * title, which are dimmed so they don't read as a saved location.
+ */
+function MarkerPill({
+  point,
+  stop,
+  selected,
+  guessedAddress,
+}: {
+  point: MapPoint
+  stop: number
+  selected: boolean
+  guessedAddress: string
+}) {
+  const Ico = point.icon
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        className={`flex items-center gap-1.5 rounded-full border px-2 py-1 shadow-lg cursor-pointer ${
+          selected
+            ? 'bg-teal border-teal text-white'
+            : 'bg-[#1a1a1a] border-white/25 text-white'
+        } ${point.inferred && !selected ? 'opacity-70 border-dashed' : ''}`}
+      >
+        <Ico size={14} className="shrink-0" />
+        <span className="text-[11px] font-bold tabular-nums leading-none">{stop}</span>
+        {selected && (
+          <span className="max-w-[9rem] truncate text-[11px] leading-none">{point.title}</span>
+        )}
+      </div>
 
-  const titleEl = document.createElement('div')
-  titleEl.style.cssText = 'font-size:13px;font-weight:600;margin:0;padding:0;'
-  titleEl.textContent = title
-  wrap.appendChild(titleEl)
+      {selected && (point.kind || guessedAddress) && (
+        <div className="mt-1 max-w-[12rem] rounded-lg bg-[#1a1a1a] border border-white/15 px-2 py-1 text-center shadow-lg">
+          {point.kind && <p className="text-[10px] text-teal/90 leading-snug">{point.kind}</p>}
+          {guessedAddress && (
+            <>
+              <p className="text-[10px] text-white/70 leading-snug break-words">
+                {guessedAddress}
+              </p>
+              <p className="text-[10px] text-amber-400/90 leading-snug">
+                Best guess from the name
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
-  if (kind) {
-    const kindEl = document.createElement('div')
-    kindEl.style.cssText = 'color:#555;font-size:12px;margin:2px 0 0;padding:0;'
-    kindEl.textContent = kind
-    wrap.appendChild(kindEl)
-  }
-
-  if (guessedAddress) {
-    const guessEl = document.createElement('div')
-    guessEl.style.cssText = 'color:#555;font-size:12px;margin:4px 0 0;padding:0;'
-    guessEl.textContent = guessedAddress
-    wrap.appendChild(guessEl)
-
-    const noteEl = document.createElement('div')
-    noteEl.style.cssText = 'color:#8a6d1f;font-size:11px;margin:2px 0 0;padding:0;'
-    noteEl.textContent = 'Best guess from the name — no location saved'
-    wrap.appendChild(noteEl)
-  }
-
-  return wrap
+      {/* Anchors the pin: advanced markers align content by its bottom centre. */}
+      <span className="mt-0.5 h-2 w-2 rounded-full bg-teal ring-2 ring-black/60" />
+    </div>
+  )
 }

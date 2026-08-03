@@ -1,7 +1,18 @@
 import { useState } from 'react'
-import { ChevronDown, MapPin, Pencil, Phone, PlaneLanding, PlaneTakeoff, Trash2 } from 'lucide-react'
+import {
+  ChevronDown,
+  LogOut,
+  MapPin,
+  Moon,
+  Pencil,
+  Phone,
+  PlaneLanding,
+  PlaneTakeoff,
+  Trash2,
+} from 'lucide-react'
 import type { ItineraryItem } from '../types'
 import { formatTime, parseDateOnly } from '../lib/format'
+import type { StayPhase } from '../lib/itineraryDay'
 import { deviceTimezone, tzAbbrev } from '../lib/timezones'
 import { iconFor } from './icons'
 
@@ -12,9 +23,11 @@ interface Props {
   onDelete: () => void
   /** When set, render just one leg of a travel item (mirrors the map). */
   leg?: 'departure' | 'arrival'
+  /** Which night of a stay this day is, so a hotel reads right all week. */
+  stay?: StayPhase
 }
 
-export default function ItemCard({ item, canEdit, onEdit, onDelete, leg }: Props) {
+export default function ItemCard({ item, canEdit, onEdit, onDelete, leg, stay }: Props) {
   const [open, setOpen] = useState(false)
   const Ico = iconFor(item)
   const isDep = leg === 'departure'
@@ -31,9 +44,13 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete, leg }: Props
   const endTimeText = formatTime(item.endTime)
     ? `${formatTime(item.endTime)}${arrivalDateText ? ` (${arrivalDateText})` : ''}`
     : ''
+  // On the checkout morning the stay is over, so the night count would misread.
+  const nights = item.nights || 1
   const timeText =
     item.type === 'lodging'
-      ? `${item.nights || 1} night${(item.nights || 1) > 1 ? 's' : ''}`
+      ? stay === 'checkout'
+        ? ''
+        : `${nights} night${nights > 1 ? 's' : ''}`
       : [formatTime(item.startTime), endTimeText].filter(Boolean).join(' – ')
 
   // For a single leg, show only that side's time; otherwise the full range.
@@ -102,6 +119,11 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete, leg }: Props
             <p className="text-teal/80 text-xs font-medium inline-flex items-center gap-1">
               {isDep ? <PlaneTakeoff size={12} /> : <PlaneLanding size={12} />}
               {isDep ? 'Departure' : 'Arrival'}
+            </p>
+          ) : stay && stay !== 'checkin' ? (
+            <p className="text-teal/80 text-xs font-medium inline-flex items-center gap-1">
+              {stay === 'checkout' ? <LogOut size={12} /> : <Moon size={12} />}
+              {stay === 'checkout' ? 'Check out' : 'Staying here'}
             </p>
           ) : (
             item.type === 'travel' &&
