@@ -124,7 +124,7 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
 
       {/* Bottom action bar */}
       <div className="fixed bottom-0 inset-x-0 border-t border-white/10 bg-black">
-        <div className="max-w-2xl mx-auto flex items-center justify-around pt-3 safe-bottom">
+        <div className="max-w-2xl mx-auto flex items-center justify-around pt-3 safe-bottom-bar">
           <IconBtn
             label="Edit"
             disabled={!selectedTrip}

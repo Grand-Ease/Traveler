@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DayPlace, ItineraryItem, Trip } from '../types'
 import { weekdayLong } from '../lib/format'
-import { itemAffectsDay } from '../lib/itineraryDay'
 import { activePlaceIndex, effectivePlacesForDay, refTimeForDay } from '../lib/locations'
 import { enrichPlaceTimezones } from '../lib/geo'
 import DayLocations from './DayLocations'
@@ -57,7 +56,6 @@ export default function DayHeaderCard({
 
   // The day's active destination drives the weather lookup.
   const activePlace = places[activePlaceIndex(places, refTimeForDay(day))]?.name
-  const total = items.filter((item) => itemAffectsDay(item, day)).length
 
   return (
     <div className="bg-headerCard border border-white/20 rounded-2xl p-4">
@@ -80,8 +78,7 @@ export default function DayHeaderCard({
         <div className="text-center">
           <h1 className="text-xl font-bold">{weekdayLong(day)}</h1>
           <p className="text-white/50 text-xs mt-1">
-            {trip.name} · Day {dayIndex + 1} of {dayCount} · {total} item
-            {total === 1 ? '' : 's'}
+            Day {dayIndex + 1} of {dayCount}
           </p>
           <DayWeather place={activePlace} date={day} />
         </div>

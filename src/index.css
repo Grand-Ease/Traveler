@@ -55,6 +55,12 @@ button {
 .safe-bottom {
   padding-bottom: calc(0.6rem + env(safe-area-inset-bottom));
 }
+/* Bottom nav bars sit closer to the bottom than `safe-bottom` allows: iOS
+   reserves 34px for the home indicator, which under a row of buttons reads as a
+   band of dead black space. Keep a floor so the row still clears the indicator. */
+.safe-bottom-bar {
+  padding-bottom: max(0.5rem, calc(env(safe-area-inset-bottom) - 1rem));
+}
 /* Bottom padding for scroll areas so content clears fixed bars + home indicator. */
 .pb-bar {
   padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));

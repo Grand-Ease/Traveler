@@ -154,21 +154,41 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
     // One day spans this element's width, which is what the deck translates by.
     <div ref={swipe.containerRef} className="flex flex-col h-full max-w-2xl mx-auto w-full">
       {/* Header (fixed, does not scroll) */}
-      <div className="shrink-0">
-        <div className="safe-top">
-          <div className="flex justify-end mb-1 px-4">
-            <SyncBadge />
-          </div>
-          <SwipeDeck
-            trackRef={swipe.trackRef}
-            cellClassName="px-4"
-            previous={prevDay && headerCard(prevDay)}
-            next={nextDay && headerCard(nextDay)}
-          >
-            {headerCard(day)}
-          </SwipeDeck>
+      <div className="shrink-0 safe-top pb-3">
+        <div className="flex justify-end mb-1 px-4">
+          <SyncBadge />
         </div>
+        <SwipeDeck
+          trackRef={swipe.trackRef}
+          cellClassName="px-4"
+          previous={prevDay && headerCard(prevDay)}
+          next={nextDay && headerCard(nextDay)}
+        >
+          {headerCard(day)}
+        </SwipeDeck>
+      </div>
 
+      {viewMode === 'map' ? (
+        /* Map fills the middle region and manages its own gestures. */
+        <div className="flex-1 min-h-0">
+          <DayMap items={allDayItems} day={day} cats={cats} />
+        </div>
+      ) : (
+        /* Items (only this region scrolls vertically) */
+        <SwipeDeck
+          trackRef={swipe.trackRef}
+          className="flex-1 min-h-0"
+          cellClassName="h-full overflow-y-auto touch-pan-y px-4 pb-4 space-y-2"
+          previous={prevDay && itemList(prevDay)}
+          next={nextDay && itemList(nextDay)}
+        >
+          {itemList(day)}
+        </SwipeDeck>
+      )}
+
+      {/* Bottom bar (fixed, does not scroll). The view and filter controls live
+          here with the other chrome because they persist across days. */}
+      <div className="shrink-0 border-t border-white/10 bg-black">
         {/* Mode toggle (segmented) + shared category filters */}
         <div
           className="flex items-center gap-2 px-4 py-3 overflow-x-auto"
@@ -223,29 +243,8 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
             )
           })}
         </div>
-      </div>
 
-      {viewMode === 'map' ? (
-        /* Map fills the middle region and manages its own gestures. */
-        <div className="flex-1 min-h-0">
-          <DayMap items={allDayItems} day={day} cats={cats} />
-        </div>
-      ) : (
-        /* Items (only this region scrolls vertically) */
-        <SwipeDeck
-          trackRef={swipe.trackRef}
-          className="flex-1 min-h-0"
-          cellClassName="h-full overflow-y-auto touch-pan-y px-4 pb-4 space-y-2"
-          previous={prevDay && itemList(prevDay)}
-          next={nextDay && itemList(nextDay)}
-        >
-          {itemList(day)}
-        </SwipeDeck>
-      )}
-
-      {/* Bottom bar (fixed, does not scroll) */}
-      <div className="shrink-0 border-t border-white/10 bg-black">
-        <div className="flex items-center justify-between px-6 pt-3 safe-bottom">
+        <div className="flex items-center justify-between px-6 pt-3 safe-bottom-bar border-t border-white/10">
           <button
             onClick={onBack}
             className="flex flex-col items-center gap-1 text-xs text-white hover:text-teal"
@@ -262,11 +261,14 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
                 <Sparkles size={22} />
                 Import
               </button>
+              {/* Stretching to the row's height keeps this the same size as,
+                  and centred with, the labelled buttons beside it. */}
               <button
                 onClick={() => startAdd(day)}
-                className="w-14 h-14 -mt-6 rounded-full bg-teal hover:bg-teal-deep flex items-center justify-center shadow-lg"
+                aria-label="Add item"
+                className="self-stretch aspect-square rounded-full bg-teal hover:bg-teal-deep flex items-center justify-center"
               >
-                <Plus size={28} />
+                <Plus size={22} />
               </button>
             </div>
           )}
