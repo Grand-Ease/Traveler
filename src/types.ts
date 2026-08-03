@@ -28,6 +28,7 @@ export const ACTIVITY_SUBTYPES = [
   'basketball',
   'football',
   'yoga',
+  'hiking',
 ] as const
 export type ActivitySubtype = (typeof ACTIVITY_SUBTYPES)[number]
 

@@ -13,17 +13,27 @@ import {
   Palette,
   Umbrella,
   Clapperboard,
-  Music,
   ShoppingBag,
-  Dumbbell,
-  Volleyball,
-  Trophy,
-  Goal,
-  Medal,
-  PersonStanding,
+  Accessibility,
+  Footprints,
+  createLucideIcon,
   type LucideIcon,
 } from 'lucide-react'
+import {
+  baseball,
+  basketball,
+  flowerLotus,
+  football,
+  tennisBall,
+} from '@lucide/lab'
 import type { ItineraryItem, ItemType } from '../types'
+
+// Lab icons ship as raw nodes; wrap them so they match LucideIcon usage.
+const Baseball = createLucideIcon('baseball', baseball)
+const Basketball = createLucideIcon('basketball', basketball)
+const Football = createLucideIcon('football', football)
+const TennisBall = createLucideIcon('tennis-ball', tennisBall)
+const FlowerLotus = createLucideIcon('flower-lotus', flowerLotus)
 
 const TRAVEL_ICONS: Record<string, LucideIcon> = {
   airplane: Plane,
@@ -41,14 +51,18 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
   sightseeing: Binoculars,
   beach: Umbrella,
   entertainment: Clapperboard,
-  dance: Music,
+  // Closest available: two people (no dancing couple in Lucide/Lab).
+  dance: Users,
   shopping: ShoppingBag,
-  gymnastics: Dumbbell,
-  tennis: Volleyball,
-  baseball: Trophy,
-  basketball: Goal,
-  football: Medal,
-  yoga: PersonStanding,
+  // Closest available: open-armed person figure (no tumble/jump icon).
+  gymnastics: Accessibility,
+  tennis: TennisBall,
+  baseball: Baseball,
+  basketball: Basketball,
+  football: Football,
+  // Closest available: lotus / meditation (no seated person in Lucide/Lab).
+  yoga: FlowerLotus,
+  hiking: Footprints,
 }
 
 const TYPE_ICONS: Record<ItemType, LucideIcon> = {
