@@ -244,33 +244,33 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
           })}
         </div>
 
-        <div className="flex items-center justify-between px-6 pt-3 safe-bottom-bar border-t border-white/10">
+        {/* Three equal columns so the add button lands on the screen's centre
+            line, whatever the labels either side of it are. */}
+        <div className="grid grid-cols-3 items-center px-6 pt-3 safe-bottom-bar border-t border-white/10">
           <button
             onClick={onBack}
-            className="flex flex-col items-center gap-1 text-xs text-white hover:text-teal"
+            className="justify-self-start flex flex-col items-center gap-1 text-xs text-white hover:text-teal"
           >
             <HomeIcon size={22} />
             Trips
           </button>
           {canEdit && (
-            <div className="flex items-center gap-3">
+            <>
+              <button
+                onClick={() => startAdd(day)}
+                aria-label="Add item"
+                className="justify-self-center w-11 h-11 rounded-full bg-teal hover:bg-teal-deep flex items-center justify-center"
+              >
+                <Plus size={22} />
+              </button>
               <button
                 onClick={() => setImporting(true)}
-                className="flex flex-col items-center gap-1 text-xs text-white hover:text-teal"
+                className="justify-self-end flex flex-col items-center gap-1 text-xs text-white hover:text-teal"
               >
                 <Sparkles size={22} />
                 Import
               </button>
-              {/* Stretching to the row's height keeps this the same size as,
-                  and centred with, the labelled buttons beside it. */}
-              <button
-                onClick={() => startAdd(day)}
-                aria-label="Add item"
-                className="self-stretch aspect-square rounded-full bg-teal hover:bg-teal-deep flex items-center justify-center"
-              >
-                <Plus size={22} />
-              </button>
-            </div>
+            </>
           )}
         </div>
       </div>
