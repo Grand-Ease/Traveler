@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapPin, Trash2 } from 'lucide-react'
 import {
   ACTIVITY_SUBTYPES,
@@ -9,7 +9,7 @@ import {
 } from '../types'
 import * as store from '../store/store'
 import { TYPE_LABEL } from '../lib/format'
-import { activePlaceIndex, effectivePlacesForDay } from '../lib/locations'
+import { activePlace, activePlaceIndex, effectivePlacesForDay } from '../lib/locations'
 import { deviceTimezone, tzAbbrev } from '../lib/timezones'
 import { hasLocation, timezoneForItem, timezoneForQuery } from '../lib/geo'
 import { iconFor, TYPE_ICONS } from './icons'
@@ -72,6 +72,15 @@ export default function ItemForm({
       type: t,
       ...(t === 'note' ? { endTime: undefined, endDate: undefined } : {}),
     }))
+
+  // The day's destination, used to bias location searches to the right city.
+  const dayCity = useMemo(
+    () =>
+      trip
+        ? activePlace(trip, itineraryItems, item.date, item.startTime)?.name
+        : undefined,
+    [trip, itineraryItems, item.date, item.startTime],
+  )
 
   // Auto-detect the destination timezone from the location as the user types.
   const debounceRef = useRef<number | undefined>(undefined)
@@ -378,10 +387,13 @@ export default function ItemForm({
           value={item.location}
           mode={item.type === 'travel' ? item.subtype || 'airplane' : undefined}
           onChange={(v) => set('location', v)}
+          near={dayCity}
+          fallbackQuery={item.type === 'travel' ? undefined : item.title}
+          suggest={item.type !== 'travel' && item.type !== 'note'}
           placeholder={
             item.type === 'travel'
               ? 'Optional — from/to are used for the time zone'
-              : 'Sets the map pin and the local time zone'
+              : 'Search by name, or type an address'
           }
         />
 

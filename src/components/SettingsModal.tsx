@@ -46,9 +46,10 @@ export default function SettingsModal({ onClose }: Props) {
               onChange={(e) => setKey(e.target.value)}
             />
             <p className="text-white/40 text-xs mt-1">
-              Optional. Enables accurate geocoding for automatic time-zone detection. Restrict
-              the key to your site’s domain in Google Cloud Console. Without it, a keyless
-              fallback is used.
+              Optional. Enables accurate geocoding for automatic time-zone detection. Enable
+              “Places API (New)” on the key for the best results when searching venues by
+              name. Restrict the key to your site’s domain in Google Cloud Console. Without
+              it, a keyless fallback is used.
             </p>
           </div>
         ) : (

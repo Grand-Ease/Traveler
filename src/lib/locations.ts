@@ -384,6 +384,18 @@ export function refTimeForDay(day: string): string {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
+/** The day's destination in effect at a given time, if any. */
+export function activePlace(
+  trip: Trip,
+  items: ItineraryItem[],
+  day: string,
+  time?: string,
+): DayPlace | undefined {
+  const { places } = effectivePlacesForDay(trip, items, day)
+  if (!places.length) return undefined
+  return places[Math.max(0, activePlaceIndex(places, time || '00:00'))]
+}
+
 /** The timezone implied by the day's active destination at a given time. */
 export function dayTimezone(
   trip: Trip,
@@ -391,10 +403,7 @@ export function dayTimezone(
   day: string,
   time?: string,
 ): string | undefined {
-  const { places } = effectivePlacesForDay(trip, items, day)
-  if (!places.length) return undefined
-  const idx = activePlaceIndex(places, time || '00:00')
-  return places[Math.max(0, idx)]?.tz
+  return activePlace(trip, items, day, time)?.tz
 }
 
 /** Return a new locations array with `day` set to `places` (or cleared if empty). */

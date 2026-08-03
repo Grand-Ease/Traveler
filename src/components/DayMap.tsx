@@ -3,7 +3,7 @@ import { Navigation } from 'lucide-react'
 import type { ItineraryItem } from '../types'
 import { getMapsKey } from '../config'
 import { loadGoogleMaps } from '../lib/googleMaps'
-import { geocodeToCoords } from '../lib/geo'
+import { geocodeToCoords, inferPlaceFromTitle, isPlaceableTitle } from '../lib/geo'
 import { directionsUrl } from '../lib/mapLinks'
 
 // Map-mode filter categories. `departure`/`arrival` split a travel item into
@@ -11,11 +11,17 @@ import { directionsUrl } from '../lib/mapLinks'
 export type MapCat = 'departure' | 'arrival' | 'lodging' | 'dining' | 'activity' | 'note'
 
 interface MapPoint {
+  /** Address to geocode, or the event title when `inferred`. */
   address: string
   title: string
   /** "Departure" / "Arrival" for travel legs; empty for single-location items. */
   kind: string
+  /** Guessed from the title + day city because the item has no location. */
+  inferred?: boolean
 }
+
+/** Stable identity for a point's lookup, so guesses and addresses never collide. */
+const pointKey = (p: MapPoint) => `${p.inferred ? 'title' : 'addr'}:${p.address}`
 
 // Minimal typing for the parts of the Google Maps JS API we touch. The loader
 // returns the maps namespace (typed only for Geocoder in googleMaps.ts), so we
@@ -65,6 +71,8 @@ interface Props {
   day: string
   /** Which map categories are enabled. */
   cats: Record<MapCat, boolean>
+  /** The day's destination; lets items without a location be placed by name. */
+  dayCity?: string
 }
 
 /** Build the ordered, category-filtered list of points for the day. */
@@ -72,6 +80,7 @@ function buildPoints(
   items: ItineraryItem[],
   day: string,
   cats: Record<MapCat, boolean>,
+  dayCity?: string,
 ): MapPoint[] {
   const ordered = [...items].sort((a, b) =>
     (a.startTime || '99').localeCompare(b.startTime || '99'),
@@ -89,34 +98,47 @@ function buildPoints(
       const cat = it.type as MapCat
       if (!cats[cat]) continue
       const loc = (it.location || '').trim()
-      if (loc) points.push({ address: loc, title: it.title, kind: '' })
+      if (loc) {
+        points.push({ address: loc, title: it.title, kind: '' })
+      } else if (dayCity && isPlaceableTitle(it.title)) {
+        // No location saved, but the title names something we can look up in
+        // the day's city.
+        points.push({ address: it.title.trim(), title: it.title, kind: '', inferred: true })
+      }
     }
   }
   return points
 }
 
-export default function DayMap({ items, day, cats }: Props) {
+export default function DayMap({ items, day, cats, dayCity }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'nokey' | 'error'>(
     'loading',
   )
+  // Addresses discovered for inferred points, so directions can use them.
+  const [foundAddresses, setFoundAddresses] = useState<Record<string, string>>({})
 
-  const points = useMemo(() => buildPoints(items, day, cats), [items, day, cats])
+  const points = useMemo(
+    () => buildPoints(items, day, cats, dayCity),
+    [items, day, cats, dayCity],
+  )
 
   // Ordered, consecutive-deduped addresses for the "Get directions" link.
+  // Inferred points only join once we know the real address they resolved to.
   const directionStops = useMemo(() => {
     const out: string[] = []
     for (const p of points) {
-      if (out[out.length - 1] === p.address) continue
-      out.push(p.address)
+      const stop = p.inferred ? foundAddresses[pointKey(p)] : p.address
+      if (!stop || out[out.length - 1] === stop) continue
+      out.push(stop)
     }
     return out
-  }, [points])
+  }, [points, foundAddresses])
 
   // Signature so the map effect only re-runs when the meaningful inputs change.
   const sig = useMemo(
-    () => JSON.stringify(points.map((p) => [p.address, p.title, p.kind])),
-    [points],
+    () => JSON.stringify([dayCity, points.map((p) => [p.address, p.title, p.kind, !!p.inferred])]),
+    [points, dayCity],
   )
 
   useEffect(() => {
@@ -143,19 +165,36 @@ export default function DayMap({ items, day, cats }: Props) {
         return
       }
 
-      // Geocode each unique address in parallel; reuse coords per address.
-      const unique = [...new Set(points.map((p) => p.address))]
-      const resolved = await Promise.all(unique.map((a) => geocodeToCoords(a)))
+      // Resolve each distinct lookup once, in parallel. Saved addresses go
+      // through the geocoder; title-only points go through the venue search.
+      const unique = new Map<string, MapPoint>()
+      for (const p of points) if (!unique.has(pointKey(p))) unique.set(pointKey(p), p)
+      const keys = [...unique.keys()]
+      const resolved = await Promise.all(
+        keys.map(async (k) => {
+          const p = unique.get(k)!
+          if (!p.inferred) return { coords: await geocodeToCoords(p.address), address: p.address }
+          const place = await inferPlaceFromTitle(p.address, dayCity)
+          return place
+            ? { coords: { lat: place.lat, lon: place.lon }, address: place.label }
+            : { coords: null, address: '' }
+        }),
+      )
       if (cancelled) return
-      const coordByAddr = new Map<string, { lat: number; lon: number }>()
-      unique.forEach((a, i) => {
-        const c = resolved[i]
-        if (c) coordByAddr.set(a, c)
+
+      const coordByKey = new Map<string, { lat: number; lon: number }>()
+      const addresses: Record<string, string> = {}
+      keys.forEach((k, i) => {
+        const { coords, address } = resolved[i]
+        if (!coords) return
+        coordByKey.set(k, coords)
+        if (unique.get(k)!.inferred) addresses[k] = address
       })
+      setFoundAddresses(addresses)
 
       const el = containerRef.current
       if (!el) return
-      if (coordByAddr.size === 0) {
+      if (coordByKey.size === 0) {
         setStatus('empty')
         return
       }
@@ -183,14 +222,20 @@ export default function DayMap({ items, day, cats }: Props) {
       const bounds = new maps.LatLngBounds()
       const path: GLatLngLiteral[] = []
 
-      points.forEach((p, i) => {
-        const c = coordByAddr.get(p.address)
+      // Number the markers that actually render, so the labels match the order
+      // of the stops in the directions link.
+      let stopNumber = 0
+      points.forEach((p) => {
+        const c = coordByKey.get(pointKey(p))
         if (!c) return
         const pos = { lat: c.lat, lng: c.lon }
+        stopNumber += 1
         const marker = new maps.Marker({
           position: pos,
           map,
-          label: { text: String(i + 1), color: '#ffffff', fontSize: '12px' },
+          label: { text: String(stopNumber), color: '#ffffff', fontSize: '12px' },
+          // Guesses are dimmed so they read as less certain than saved pins.
+          opacity: p.inferred ? 0.65 : 1,
           title: p.kind ? `${p.title} (${p.kind})` : p.title,
         })
         // One shared InfoWindow: text stays visible, only one popup at a time,
@@ -201,7 +246,9 @@ export default function DayMap({ items, day, cats }: Props) {
             openMarker = null
             return
           }
-          infoWindow.setContent(buildInfoContent(p.title, p.kind))
+          infoWindow.setContent(
+            buildInfoContent(p.title, p.kind, p.inferred ? addresses[pointKey(p)] : ''),
+          )
           infoWindow.open({ map, anchor: marker })
           openMarker = marker
         })
@@ -280,7 +327,8 @@ export default function DayMap({ items, day, cats }: Props) {
   )
 }
 
-function buildInfoContent(title: string, kind: string): HTMLElement {
+/** `guessedAddress` is set only for pins found from the title, not saved on the item. */
+function buildInfoContent(title: string, kind: string, guessedAddress: string): HTMLElement {
   const wrap = document.createElement('div')
   wrap.style.cssText =
     'color:#111;font-family:system-ui,-apple-system,sans-serif;line-height:1.3;margin:0;padding:0;'
@@ -295,6 +343,18 @@ function buildInfoContent(title: string, kind: string): HTMLElement {
     kindEl.style.cssText = 'color:#555;font-size:12px;margin:2px 0 0;padding:0;'
     kindEl.textContent = kind
     wrap.appendChild(kindEl)
+  }
+
+  if (guessedAddress) {
+    const guessEl = document.createElement('div')
+    guessEl.style.cssText = 'color:#555;font-size:12px;margin:4px 0 0;padding:0;'
+    guessEl.textContent = guessedAddress
+    wrap.appendChild(guessEl)
+
+    const noteEl = document.createElement('div')
+    noteEl.style.cssText = 'color:#8a6d1f;font-size:11px;margin:2px 0 0;padding:0;'
+    noteEl.textContent = 'Best guess from the name — no location saved'
+    wrap.appendChild(noteEl)
   }
 
   return wrap

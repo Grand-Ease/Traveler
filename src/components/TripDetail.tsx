@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import type { DayPlace, ItineraryItem, Trip } from '../types'
 import { itemAffectsDay, tripDays } from '../lib/itineraryDay'
-import { setDayPlaces } from '../lib/locations'
+import { activePlace, setDayPlaces } from '../lib/locations'
 import { useDaySwipe } from '../hooks/useDaySwipe'
 import * as store from '../store/store'
 import { useItems, useTrip } from '../store/hooks'
@@ -102,6 +102,10 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
     [items, day],
   )
 
+  // Where the traveller is that day — the search context for items whose
+  // location is only implied by their name.
+  const dayCity = useMemo(() => activePlace(trip, items, day)?.name, [trip, items, day])
+
   function removeItem(it: ItineraryItem) {
     if (!it.id) return
     if (!confirm(`Delete “${it.title}”?`)) return
@@ -171,7 +175,7 @@ export default function TripDetail({ trip: tripProp, onBack }: Props) {
       {viewMode === 'map' ? (
         /* Map fills the middle region and manages its own gestures. */
         <div className="flex-1 min-h-0">
-          <DayMap items={allDayItems} day={day} cats={cats} />
+          <DayMap items={allDayItems} day={day} cats={cats} dayCity={dayCity} />
         </div>
       ) : (
         /* Items (only this region scrolls vertically) */
