@@ -1,4 +1,4 @@
-import { Cloud, CloudOff, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Alert, Cloud, CloudOff, Refresh } from './icons'
 import { useSyncStatus } from '../store/hooks'
 import { sync } from '../store/store'
 
@@ -15,15 +15,15 @@ export default function SyncBadge() {
     cls = 'text-amber-400'
     text = pending ? `Offline · ${pending} to sync` : 'Offline'
   } else if (syncing) {
-    Icon = RefreshCw
+    Icon = Refresh
     cls = 'text-teal'
     text = 'Syncing…'
   } else if (pending) {
-    Icon = RefreshCw
+    Icon = Refresh
     cls = 'text-teal'
     text = `${pending} to sync`
   } else if (lastError) {
-    Icon = TriangleAlert
+    Icon = Alert
     cls = 'text-amber-400'
     text = 'Sync issue'
   }

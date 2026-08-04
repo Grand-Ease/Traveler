@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from './icons'
 import type { DayPlace, ItineraryItem, Trip } from '../types'
 import { weekdayLong } from '../lib/format'
 import { activePlaceIndex, effectivePlacesForDay, refTimeForDay } from '../lib/locations'

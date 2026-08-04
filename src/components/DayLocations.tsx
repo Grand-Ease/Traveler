@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, MapPin, Plus, X } from 'lucide-react'
+import { ChevronRight, Close, MapMarker, Plus } from './icons'
 import type { DayPlace } from '../types'
 import {
   activePlaceIndex,
@@ -111,7 +111,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
       <div className="mt-2 space-y-2">
         {draft.map((p, i) => (
           <div key={i} className="flex items-center gap-2">
-            <MapPin size={16} className="text-teal shrink-0" />
+            <MapMarker size={16} className="text-teal shrink-0" />
             <input
               className="field flex-1 !py-1.5"
               value={p.name}
@@ -134,7 +134,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
                 className="text-white/40 hover:text-red-400 p-1"
                 title="Remove"
               >
-                <X size={16} />
+                <Close size={16} />
               </button>
             )}
           </div>
@@ -192,7 +192,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
             onClick={() => beginEdit()}
             className="inline-flex items-center gap-1.5 text-white/50 hover:text-white"
           >
-            <MapPin size={18} /> <span className="text-lg">Set destination</span>
+            <MapMarker size={18} /> <span className="text-lg">Set destination</span>
           </button>
         )}
       </div>
@@ -225,7 +225,7 @@ export default function DayLocations({ places, source, day, canEdit, onSave }: P
               className="flex shrink-0 items-center gap-1.5"
             >
               {i > 0 && <ChevronRight size={16} className="text-white/30 shrink-0" />}
-              <MapPin
+              <MapMarker
                 size={isActive ? 18 : 13}
                 className={isActive ? 'text-yellow-300 shrink-0' : 'text-white/40 shrink-0'}
               />

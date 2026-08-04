@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogOut, Pencil, Plus, Settings, Share2, Trash2 } from 'lucide-react'
+import { Cog, Logout, Pencil, Plus, Share, TrashCan } from './icons'
 import type { Trip } from '../types'
 import { supabase } from '../supabase/client'
 import { asset } from '../config'
@@ -57,7 +57,7 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
           className="text-white/50 hover:text-white p-2"
           title="Settings"
         >
-          <Settings size={20} />
+          <Cog size={20} />
         </button>
         <button
           onClick={() => {
@@ -67,7 +67,7 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
           className="text-white/50 hover:text-white p-2"
           title="Sign out"
         >
-          <LogOut size={20} />
+          <Logout size={20} />
         </button>
       </header>
 
@@ -137,14 +137,14 @@ export default function Home({ onOpenTrip, onSignOut }: Props) {
             disabled={!selectedTrip}
             onClick={() => selectedTrip && setSharing(selectedTrip)}
           >
-            <Share2 size={22} />
+            <Share size={22} />
           </IconBtn>
           <IconBtn
             label="Delete"
             disabled={!selectedTrip}
             onClick={() => selectedTrip && removeTrip(selectedTrip)}
           >
-            <Trash2 size={22} />
+            <TrashCan size={22} />
           </IconBtn>
         </div>
       </div>

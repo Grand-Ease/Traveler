@@ -1,20 +1,20 @@
 import { useState } from 'react'
-import {
-  ChevronDown,
-  LogOut,
-  MapPin,
-  Moon,
-  Pencil,
-  Phone,
-  PlaneLanding,
-  PlaneTakeoff,
-  Trash2,
-} from 'lucide-react'
 import type { ItineraryItem } from '../types'
 import { formatTime, parseDateOnly } from '../lib/format'
 import type { StayPhase } from '../lib/itineraryDay'
 import { deviceTimezone, tzAbbrev } from '../lib/timezones'
-import { iconFor } from './icons'
+import {
+  AirplaneLanding,
+  AirplaneTakeoff,
+  ChevronDown,
+  Logout,
+  MapMarker,
+  Pencil,
+  Phone,
+  TrashCan,
+  WeatherNight,
+} from './icons'
+import { iconFor } from './itemIcons'
 
 interface Props {
   item: ItineraryItem
@@ -117,12 +117,12 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete, leg, stay }:
 
           {leg ? (
             <p className="text-teal/80 text-xs font-medium inline-flex items-center gap-1">
-              {isDep ? <PlaneTakeoff size={12} /> : <PlaneLanding size={12} />}
+              {isDep ? <AirplaneTakeoff size={12} /> : <AirplaneLanding size={12} />}
               {isDep ? 'Departure' : 'Arrival'}
             </p>
           ) : stay && stay !== 'checkin' ? (
             <p className="text-teal/80 text-xs font-medium inline-flex items-center gap-1">
-              {stay === 'checkout' ? <LogOut size={12} /> : <Moon size={12} />}
+              {stay === 'checkout' ? <Logout size={12} /> : <WeatherNight size={12} />}
               {stay === 'checkout' ? 'Check out' : 'Staying here'}
             </p>
           ) : (
@@ -146,7 +146,7 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete, leg, stay }:
               rel="noreferrer"
               className="text-white/50 text-sm inline-flex items-center gap-1 hover:text-teal"
             >
-              <MapPin size={13} /> {displayLocation}
+              <MapMarker size={13} /> {displayLocation}
             </a>
           )}
 
@@ -176,7 +176,7 @@ export default function ItemCard({ item, canEdit, onEdit, onDelete, leg, stay }:
                     onClick={onDelete}
                     className="inline-flex items-center gap-1 text-red-400 hover:opacity-80"
                   >
-                    <Trash2 size={14} /> Delete
+                    <TrashCan size={14} /> Delete
                   </button>
                 </div>
               )}

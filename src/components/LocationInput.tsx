@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapPin, Plane, Search, TrainFront, X } from 'lucide-react'
+import { Airplane, Close, Magnify, MapMarker, Train } from './icons'
 import {
   inferPlaceFromTitle,
   resolvePlaces,
@@ -243,7 +243,7 @@ export default function LocationInput({
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => void runSearch()}
         >
-          <Search size={16} />
+          <Magnify size={16} />
         </button>
       </div>
       {looking && (
@@ -260,7 +260,7 @@ export default function LocationInput({
           role="listbox"
         >
           {candidates.map((c, i) => {
-            const Ico = c.kind === 'airport' ? Plane : c.kind === 'station' ? TrainFront : null
+            const Ico = c.kind === 'airport' ? Airplane : c.kind === 'station' ? Train : null
             return (
               <li key={`${c.lat},${c.lon},${i}`}>
                 <button
@@ -280,7 +280,7 @@ export default function LocationInput({
       )}
       {suggestion && !open && (
         <div className="mt-1.5 flex items-start gap-2 rounded-lg border border-teal/30 bg-teal/10 px-2.5 py-2">
-          <MapPin size={14} className="mt-0.5 shrink-0 text-teal" />
+          <MapMarker size={14} className="mt-0.5 shrink-0 text-teal" />
           <div className="min-w-0 flex-1">
             <p className="text-[11px] text-white/50">Suggested from the name</p>
             <p className="text-xs leading-snug break-words">{suggestion.label}</p>
@@ -301,7 +301,7 @@ export default function LocationInput({
               setSuggestion(null)
             }}
           >
-            <X size={14} />
+            <Close size={14} />
           </button>
         </div>
       )}

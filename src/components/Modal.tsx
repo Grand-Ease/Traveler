@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { Close } from './icons'
 
 interface Props {
   title: string
@@ -27,7 +27,7 @@ export default function Modal({ title, onClose, children, footer }: Props) {
         <div className="flex items-center justify-between px-4 py-3 safe-top sm:pt-3 border-b border-white/10">
           <h2 className="text-lg font-semibold">{title}</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10">
-            <X size={20} />
+            <Close size={20} />
           </button>
         </div>
         <div

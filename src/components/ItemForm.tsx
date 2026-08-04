@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MapPin, Trash2 } from 'lucide-react'
 import {
   ACTIVITY_SUBTYPES,
   TRAVEL_SUBTYPES,
@@ -12,7 +11,8 @@ import { TYPE_LABEL } from '../lib/format'
 import { activePlace, activePlaceIndex, effectivePlacesForDay } from '../lib/locations'
 import { deviceTimezone, tzAbbrev } from '../lib/timezones'
 import { hasLocation, timezoneForItem, timezoneForQuery } from '../lib/geo'
-import { iconFor, TYPE_ICONS } from './icons'
+import { MapMarker, TrashCan } from './icons'
+import { iconFor, TYPE_ICONS } from './itemIcons'
 import LocationInput from './LocationInput'
 import Modal from './Modal'
 
@@ -165,7 +165,7 @@ export default function ItemForm({
               onClick={remove}
               disabled={saving}
             >
-              <Trash2 size={16} />
+              <TrashCan size={16} />
               Delete
             </button>
           )}
@@ -399,7 +399,7 @@ export default function ItemForm({
 
         {item.type !== 'lodging' && (
           <p className="text-xs -mt-2 flex items-center gap-1.5">
-            <MapPin size={12} className="text-white/40 shrink-0" />
+            <MapMarker size={12} className="text-white/40 shrink-0" />
             {detecting ? (
               <span className="text-white/50">Detecting time zone from location…</span>
             ) : detectedTz ? (

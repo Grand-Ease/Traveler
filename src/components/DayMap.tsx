@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { Navigation, type LucideIcon } from 'lucide-react'
 import type { ItineraryItem } from '../types'
 import { getMapsKey, getMapsMapId } from '../config'
 import { loadGoogleMaps } from '../lib/googleMaps'
 import { geocodeToCoords, inferPlaceFromTitle, isPlaceableTitle } from '../lib/geo'
 import { sortTimeForDay } from '../lib/itineraryDay'
 import { directionsUrl } from '../lib/mapLinks'
-import { iconFor } from './icons'
+import { Navigation, type AppIcon } from './icons'
+import { iconFor } from './itemIcons'
 
 // Map-mode filter categories. `departure`/`arrival` split a travel item into
 // two points; the rest map 1:1 to item types.
@@ -22,7 +22,7 @@ interface MapPoint {
   /** Guessed from the title + day city because the item has no location. */
   inferred?: boolean
   /** Same glyph the item shows in the list, so the two views read alike. */
-  icon: LucideIcon
+  icon: AppIcon
 }
 
 /** Stable identity for a point's lookup, so guesses and addresses never collide. */

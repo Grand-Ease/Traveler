@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, Trash2 } from 'lucide-react'
+import { Refresh, TrashCan } from './icons'
 import type { Trip } from '../types'
 import {
   listShares,
@@ -200,7 +200,7 @@ export default function ShareModal({ trip, onClose }: Props) {
                         }
                         aria-label={`Resend invite to ${s.email}`}
                       >
-                        <RefreshCw size={16} />
+                        <Refresh size={16} />
                       </button>
                     )}
                     {s.role !== 'owner' && (
@@ -215,7 +215,7 @@ export default function ShareModal({ trip, onClose }: Props) {
                             : `Cancel invite for ${s.email}`
                         }
                       >
-                        <Trash2 size={16} />
+                        <TrashCan size={16} />
                       </button>
                     )}
                   </div>

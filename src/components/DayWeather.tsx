@@ -1,29 +1,29 @@
 import { useEffect, useState } from 'react'
-import {
-  Cloud,
-  CloudDrizzle,
-  CloudFog,
-  CloudLightning,
-  CloudRain,
-  CloudSnow,
-  CloudSun,
-  Sun,
-  type LucideIcon,
-} from 'lucide-react'
 import { geocodeToCoords } from '../lib/geo'
 import { getDailyWeather, weatherLabel, type DailyWeather } from '../lib/weather'
+import {
+  WeatherCloudy,
+  WeatherFog,
+  WeatherLightning,
+  WeatherPartlyCloudy,
+  WeatherPouring,
+  WeatherRainy,
+  WeatherSnowy,
+  WeatherSunny,
+  type AppIcon,
+} from './icons'
 
-function iconForCode(code: number): LucideIcon {
-  if (code === 0) return Sun
-  if (code <= 2) return CloudSun
-  if (code === 3) return Cloud
-  if (code <= 48) return CloudFog
-  if (code <= 57) return CloudDrizzle
-  if (code <= 67) return CloudRain
-  if (code <= 77) return CloudSnow
-  if (code <= 82) return CloudRain
-  if (code <= 86) return CloudSnow
-  return CloudLightning
+function iconForCode(code: number): AppIcon {
+  if (code === 0) return WeatherSunny
+  if (code <= 2) return WeatherPartlyCloudy
+  if (code === 3) return WeatherCloudy
+  if (code <= 48) return WeatherFog
+  if (code <= 57) return WeatherRainy
+  if (code <= 67) return WeatherPouring
+  if (code <= 77) return WeatherSnowy
+  if (code <= 82) return WeatherPouring
+  if (code <= 86) return WeatherSnowy
+  return WeatherLightning
 }
 
 interface Props {

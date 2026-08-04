@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  Home as HomeIcon,
-  List as ListIcon,
-  Map as MapIcon,
-  PlaneLanding,
-  PlaneTakeoff,
-  Plus,
-  Sparkles,
-  type LucideIcon,
-} from 'lucide-react'
 import type { DayPlace, ItineraryItem, Trip } from '../types'
 import { itemAffectsDay, tripDays } from '../lib/itineraryDay'
 import { activePlace, setDayPlaces } from '../lib/locations'
 import { useDaySwipe } from '../hooks/useDaySwipe'
 import * as store from '../store/store'
 import { useItems, useTrip } from '../store/hooks'
-import { TYPE_ICONS } from './icons'
+import {
+  AirplaneLanding,
+  AirplaneTakeoff,
+  Home as HomeIcon,
+  ListBulleted as ListIcon,
+  MapIcon,
+  Plus,
+  Sparkles,
+  type AppIcon,
+} from './icons'
+import { TYPE_ICONS } from './itemIcons'
 import DayMap, { type MapCat } from './DayMap'
 import DayHeaderCard from './DayHeaderCard'
 import DayItemList from './DayItemList'
@@ -32,9 +32,9 @@ interface Props {
 // Shared multi-select categories for BOTH list and map. Travel is split into
 // departure/arrival; the rest map 1:1 to item types.
 const CATS: MapCat[] = ['departure', 'arrival', 'lodging', 'dining', 'activity', 'note']
-const CAT_ICON: Record<MapCat, LucideIcon> = {
-  departure: PlaneTakeoff,
-  arrival: PlaneLanding,
+const CAT_ICON: Record<MapCat, AppIcon> = {
+  departure: AirplaneTakeoff,
+  arrival: AirplaneLanding,
   lodging: TYPE_ICONS.lodging,
   dining: TYPE_ICONS.dining,
   activity: TYPE_ICONS.activity,
